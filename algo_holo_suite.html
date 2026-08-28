@@ -1,0 +1,1595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ALGO://HOLO — Interactive Algorithm Console</title>
+<style>
+  :root{
+    --void:#060a14;
+    --panel:#0c1526;
+    --panel-2:#0f1d34;
+    --line:rgba(94,211,255,0.18);
+    --cyan:#4ee3ff;
+    --cyan-dim:#2a8aa8;
+    --violet:#b98bff;
+    --green:#3be8a6;
+    --red:#ff6169;
+    --amber:#ffcf6b;
+    --text:#e7f4ff;
+    --text-dim:#7f93ad;
+    --mono: 'SFMono-Regular', 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+    --sans: -apple-system, 'Inter', 'Segoe UI', system-ui, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--void);color:var(--text);font-family:var(--sans);height:100%;overflow-x:hidden;}
+  body{
+    background-image:
+      radial-gradient(ellipse 80% 60% at 50% -10%, rgba(78,227,255,0.10), transparent 60%),
+      radial-gradient(ellipse 60% 50% at 90% 100%, rgba(185,139,255,0.08), transparent 60%),
+      repeating-linear-gradient(0deg, rgba(94,211,255,0.035) 0px, rgba(94,211,255,0.035) 1px, transparent 1px, transparent 34px),
+      repeating-linear-gradient(90deg, rgba(94,211,255,0.035) 0px, rgba(94,211,255,0.035) 1px, transparent 1px, transparent 34px);
+    min-height:100vh;
+  }
+  ::selection{background:rgba(78,227,255,0.3);}
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important;}
+  }
+
+  .scanline{
+    position:fixed; left:0; right:0; height:2px; top:0;
+    background:linear-gradient(90deg, transparent, rgba(78,227,255,0.55), transparent);
+    animation:scan 7s linear infinite; pointer-events:none; z-index:5; opacity:0.6;
+  }
+  @keyframes scan{ 0%{top:-2px;} 100%{top:100%;} }
+
+  #app{position:relative; z-index:1; max-width:1200px; margin:0 auto; padding:26px 22px 80px;}
+
+  .hud-bar{display:flex; align-items:center; justify-content:space-between; margin-bottom:26px; gap:14px; flex-wrap:wrap;}
+  .hud-brand{display:flex; align-items:center; gap:12px; font-family:var(--mono); letter-spacing:2px;}
+  .hud-dot{width:9px; height:9px; border-radius:50%; background:var(--green); box-shadow:0 0 10px var(--green); animation:pulse 1.8s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;} 50%{opacity:0.35;}}
+  .hud-brand .title{font-size:15px; font-weight:700; color:var(--cyan); text-shadow:0 0 12px rgba(78,227,255,0.6);}
+  .hud-brand .sub{font-size:11px; color:var(--text-dim);}
+  .nav-btn{
+    font-family:var(--mono); font-size:12px; letter-spacing:1px; color:var(--cyan); background:rgba(78,227,255,0.06);
+    border:1px solid var(--line); padding:9px 16px; border-radius:3px; cursor:pointer; text-transform:uppercase;
+    transition:all .18s ease; display:none;
+  }
+  .nav-btn:hover{background:rgba(78,227,255,0.14); box-shadow:0 0 16px rgba(78,227,255,0.25); transform:translateY(-1px);}
+  .nav-btn.visible{display:inline-block;}
+
+  .view{display:none; animation:fadein .45s ease;}
+  .view.active{display:block;}
+  @keyframes fadein{ from{opacity:0; transform:translateY(8px) scale(0.995);} to{opacity:1; transform:translateY(0) scale(1);} }
+
+  /* ---------- HUB ---------- */
+  .hub-hero{margin-bottom:34px;}
+  .hub-eyebrow{font-family:var(--mono); font-size:11px; color:var(--violet); letter-spacing:3px; text-transform:uppercase; margin-bottom:10px; display:flex; align-items:center; gap:8px;}
+  .hub-eyebrow::before{content:''; width:22px; height:1px; background:var(--violet); box-shadow:0 0 8px var(--violet); display:inline-block;}
+  .hub-hero h1{font-family:var(--mono); font-size:clamp(26px,4vw,40px); margin:0 0 10px; font-weight:700; line-height:1.15;
+    background:linear-gradient(90deg, var(--cyan), var(--violet)); -webkit-background-clip:text; background-clip:text; color:transparent;
+    text-shadow:0 0 30px rgba(78,227,255,0.15);}
+  .hub-hero p{color:var(--text-dim); max-width:620px; line-height:1.6; font-size:14.5px;}
+
+  .node-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(280px,1fr)); gap:20px; margin-bottom:22px;}
+  .node-card{
+    position:relative; background:linear-gradient(180deg, var(--panel), var(--panel-2));
+    border:1px solid var(--line); border-radius:6px; padding:24px; cursor:pointer; overflow:hidden;
+    transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+  }
+  .node-card::before{
+    content:''; position:absolute; inset:0; border-radius:6px; padding:1px;
+    background:linear-gradient(135deg, transparent 40%, rgba(78,227,255,0.4), transparent 60%);
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor; mask-composite:exclude; opacity:0; transition:opacity .2s ease;
+  }
+  .node-card:hover{transform:translateY(-4px); border-color:var(--cyan-dim); box-shadow:0 10px 40px rgba(78,227,255,0.12), 0 0 0 1px rgba(78,227,255,0.08) inset;}
+  .node-card:hover::before{opacity:1;}
+  .node-index{font-family:var(--mono); font-size:11px; color:var(--cyan-dim); letter-spacing:2px; margin-bottom:14px;}
+  .node-card h3{margin:0 0 8px; font-size:19px; color:var(--text); font-weight:700;}
+  .node-card .desc{color:var(--text-dim); font-size:13px; line-height:1.55; margin-bottom:16px; min-height:40px;}
+  .badge-row{display:flex; flex-wrap:wrap; gap:6px;}
+  .badge{font-family:var(--mono); font-size:10.5px; padding:4px 9px; border-radius:20px; border:1px solid; letter-spacing:0.5px;}
+  .badge.b-cyan{color:var(--cyan); border-color:rgba(78,227,255,0.4); background:rgba(78,227,255,0.06);}
+  .badge.b-violet{color:var(--violet); border-color:rgba(185,139,255,0.4); background:rgba(185,139,255,0.06);}
+  .badge.b-green{color:var(--green); border-color:rgba(59,232,166,0.4); background:rgba(59,232,166,0.06);}
+  .badge.b-amber{color:var(--amber); border-color:rgba(255,207,107,0.4); background:rgba(255,207,107,0.06);}
+  .enter-row{margin-top:16px; font-family:var(--mono); font-size:11.5px; color:var(--cyan); letter-spacing:1.5px; display:flex; align-items:center; gap:6px;}
+  .enter-row .arrow{transition:transform .2s ease;}
+  .node-card:hover .arrow{transform:translateX(4px);}
+
+  .hub-footer-note{font-family:var(--mono); font-size:11px; color:var(--text-dim); text-align:center; margin-top:30px; letter-spacing:1px; opacity:0.7;}
+
+  /* ---------- MODULE SHELL ---------- */
+  .module-head{margin-bottom:22px;}
+  .module-eyebrow{font-family:var(--mono); font-size:11px; color:var(--cyan-dim); letter-spacing:2px; text-transform:uppercase; margin-bottom:6px;}
+  .module-head h2{font-family:var(--mono); font-size:26px; margin:0 0 8px; color:var(--text);}
+  .module-head .aim{color:var(--text-dim); font-size:14px; line-height:1.6; max-width:760px;}
+
+  .algo-tabs{display:flex; gap:8px; margin:18px 0 20px; flex-wrap:wrap;}
+  .algo-tab{
+    font-family:var(--mono); font-size:12px; letter-spacing:0.5px; padding:9px 15px; border-radius:3px;
+    border:1px solid var(--line); background:rgba(255,255,255,0.02); color:var(--text-dim); cursor:pointer; transition:all .15s ease;
+  }
+  .algo-tab:hover{color:var(--text); border-color:var(--cyan-dim);}
+  .algo-tab.active{color:var(--void); background:var(--cyan); border-color:var(--cyan); font-weight:700; box-shadow:0 0 18px rgba(78,227,255,0.4);}
+
+  .panel-grid{display:grid; grid-template-columns:1.5fr 1fr; gap:18px;}
+  @media (max-width:880px){ .panel-grid{grid-template-columns:1fr;} }
+
+  .panel{background:linear-gradient(180deg, var(--panel), var(--panel-2)); border:1px solid var(--line); border-radius:6px; padding:20px;}
+  .panel-title{font-family:var(--mono); font-size:11px; letter-spacing:2px; color:var(--violet); text-transform:uppercase; margin-bottom:14px; display:flex; align-items:center; gap:8px;}
+  .panel-title::before{content:''; width:6px; height:6px; background:var(--violet); border-radius:50%; box-shadow:0 0 8px var(--violet);}
+
+  /* visualizer surfaces */
+  .viz-surface{min-height:170px; display:flex; align-items:center; justify-content:center; padding:10px 0;}
+  .array-row{display:flex; gap:6px; flex-wrap:wrap; justify-content:center;}
+  .cell{
+    position:relative; min-width:46px; height:46px; display:flex; align-items:center; justify-content:center;
+    background:rgba(255,255,255,0.03); border:1px solid var(--line); border-radius:4px; font-family:var(--mono); font-size:13px;
+    transition:all .25s ease; color:var(--text);
+  }
+  .cell.out-of-range{opacity:0.25;}
+  .cell.pointer-active{border-color:var(--cyan); box-shadow:0 0 16px rgba(78,227,255,0.45); background:rgba(78,227,255,0.1);}
+  .cell.hit{border-color:var(--green); background:rgba(59,232,166,0.16); box-shadow:0 0 18px rgba(59,232,166,0.4); color:var(--green); font-weight:700;}
+  .cell.miss{border-color:var(--red); background:rgba(255,97,105,0.14); box-shadow:0 0 18px rgba(255,97,105,0.3);}
+  .cell-markers{position:absolute; top:-22px; left:0; right:0; display:flex; justify-content:center; gap:3px; font-family:var(--mono); font-size:9px; font-weight:700;}
+  .marker{padding:1px 4px; border-radius:2px;}
+  .m-low{color:var(--amber); background:rgba(255,207,107,0.12);}
+  .m-high{color:var(--violet); background:rgba(185,139,255,0.12);}
+  .m-pos{color:var(--cyan); background:rgba(78,227,255,0.14);}
+
+  .string-block{display:flex; flex-direction:column; gap:16px; width:100%;}
+  .string-row-label{font-family:var(--mono); font-size:10px; color:var(--text-dim); letter-spacing:1.5px; margin-bottom:6px; text-transform:uppercase;}
+  .char-row{display:flex; gap:4px; flex-wrap:wrap;}
+  .char-cell{
+    width:30px; height:34px; display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:13px;
+    background:rgba(255,255,255,0.03); border:1px solid var(--line); border-radius:3px; transition:all .2s ease; color:var(--text-dim);
+  }
+  .char-cell.in-window{color:var(--text); border-color:rgba(78,227,255,0.3);}
+  .char-cell.cur{border-color:var(--cyan); box-shadow:0 0 12px rgba(78,227,255,0.45); color:var(--cyan);}
+  .char-cell.match{border-color:var(--green); background:rgba(59,232,166,0.16); color:var(--green);}
+  .char-cell.mismatch{border-color:var(--red); background:rgba(255,97,105,0.16); color:var(--red);}
+  .pattern-row{margin-left:0;}
+  .lps-row{display:flex; gap:4px; flex-wrap:wrap; margin-top:2px;}
+  .lps-cell{width:30px; height:24px; display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:11px; color:var(--violet); background:rgba(185,139,255,0.06); border:1px solid rgba(185,139,255,0.25); border-radius:3px;}
+
+  /* code panel */
+  .code-panel{font-family:var(--mono); font-size:12.3px; line-height:1.85; overflow-x:auto;}
+  .code-line{padding:2px 10px; border-radius:3px; color:var(--text-dim); white-space:pre;}
+  .code-line.hl{background:rgba(78,227,255,0.12); color:var(--cyan); box-shadow:inset 3px 0 0 var(--cyan);}
+
+  /* caption + controls */
+  .caption-box{
+    margin-top:16px; padding:14px 16px; background:rgba(255,255,255,0.02); border:1px solid var(--line); border-left:3px solid var(--cyan);
+    border-radius:4px; font-size:13.5px; line-height:1.55; min-height:44px; color:var(--text);
+  }
+  .stat-row{display:flex; gap:22px; margin-top:14px; flex-wrap:wrap;}
+  .stat{font-family:var(--mono); font-size:11.5px; color:var(--text-dim);}
+  .stat b{color:var(--cyan); font-size:15px; display:block; margin-top:2px;}
+
+  .controls{display:flex; align-items:center; gap:10px; margin-top:18px; flex-wrap:wrap;}
+  .ctrl-btn{
+    width:38px; height:38px; border-radius:50%; border:1px solid var(--line); background:rgba(255,255,255,0.03); color:var(--cyan);
+    cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; transition:all .15s ease;
+  }
+  .ctrl-btn:hover{border-color:var(--cyan); box-shadow:0 0 14px rgba(78,227,255,0.35); background:rgba(78,227,255,0.08);}
+  .ctrl-btn.play{background:rgba(78,227,255,0.12); border-color:var(--cyan);}
+  .ctrl-btn:disabled{opacity:0.3; cursor:not-allowed;}
+  .step-counter{font-family:var(--mono); font-size:12px; color:var(--text-dim); min-width:76px; text-align:center;}
+  .speed-wrap{display:flex; align-items:center; gap:8px; margin-left:auto; font-family:var(--mono); font-size:10.5px; color:var(--text-dim);}
+  input[type="range"]{accent-color:var(--cyan); width:90px;}
+  .reset-btn{font-family:var(--mono); font-size:11px; color:var(--text-dim); background:none; border:1px solid var(--line); border-radius:3px; padding:8px 12px; cursor:pointer;}
+  .reset-btn:hover{color:var(--red); border-color:var(--red);}
+
+  .complexity-badges{display:flex; gap:8px; flex-wrap:wrap; margin-top:16px;}
+
+  .collapsible{margin-top:16px; border-top:1px solid var(--line); padding-top:14px;}
+  .collapsible summary{cursor:pointer; font-family:var(--mono); font-size:11px; letter-spacing:1.5px; color:var(--text-dim); text-transform:uppercase; outline:none;}
+  .collapsible summary:hover{color:var(--cyan);}
+  .collapsible .body{margin-top:10px; font-size:13px; line-height:1.65; color:var(--text-dim);}
+
+  .prevnext{display:flex; justify-content:space-between; margin-top:30px;}
+  .pn-btn{font-family:var(--mono); font-size:12px; color:var(--cyan); background:rgba(78,227,255,0.05); border:1px solid var(--line); padding:10px 16px; border-radius:4px; cursor:pointer;}
+  .pn-btn:hover{background:rgba(78,227,255,0.12); box-shadow:0 0 16px rgba(78,227,255,0.2);}
+
+  /* compare view */
+  .compare-table{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12.5px;}
+  .compare-table th, .compare-table td{padding:10px 12px; text-align:left; border-bottom:1px solid var(--line);}
+  .compare-table th{color:var(--violet); text-transform:uppercase; font-size:10.5px; letter-spacing:1px;}
+  .bar-wrap{display:flex; align-items:center; gap:8px;}
+  .bar-track{flex:1; height:9px; background:rgba(255,255,255,0.04); border-radius:5px; overflow:hidden; min-width:100px;}
+  .bar-fill{height:100%; border-radius:5px; background:linear-gradient(90deg, var(--cyan), var(--violet)); box-shadow:0 0 10px rgba(78,227,255,0.4);}
+
+  kbd{font-family:var(--mono); background:rgba(255,255,255,0.06); border:1px solid var(--line); border-radius:3px; padding:1px 5px; font-size:10.5px;}
+</style>
+</head>
+<body>
+<div class="scanline"></div>
+<div id="app">
+
+  <div class="hud-bar">
+    <div class="hud-brand">
+      <span class="hud-dot"></span>
+      <span class="title">ALGO://HOLO</span>
+      <span class="sub">— algorithm visualization console</span>
+    </div>
+    <button class="nav-btn" id="hubBtn" onclick="showView('hub')">⌂ Return to Hub</button>
+  </div>
+
+  <!-- ===================== HUB VIEW ===================== -->
+  <section class="view active" id="view-hub">
+    <div class="hub-hero">
+      <div class="hub-eyebrow">DAA Lab · Experiment Console</div>
+      <h1>Two experiments, rendered as light.</h1>
+      <p>Select a module below to step through the real algorithm logic — extracted straight from the source programs — one comparison at a time. Every highlighted index, pointer position, and comparison count is computed live in your browser, not pre-baked.</p>
+    </div>
+
+    <div class="node-grid">
+      <div class="node-card" onclick="showView('search')">
+        <div class="node-index">EXPERIMENT 01 · ARRAY SEARCH</div>
+        <h3>Interpolation vs. Binary Search</h3>
+        <div class="desc">Probe a sorted array using a proportional position estimate instead of always splitting in half — then compare it head-to-head against classic binary search.</div>
+        <div class="badge-row">
+          <span class="badge b-cyan">avg O(log log n)</span>
+          <span class="badge b-violet">worst O(n)</span>
+          <span class="badge b-green">space O(1)</span>
+        </div>
+        <div class="enter-row">ENTER MODULE <span class="arrow">→</span></div>
+      </div>
+
+      <div class="node-card" onclick="showView('string')">
+        <div class="node-index">EXPERIMENT 02 · STRING MATCHING</div>
+        <h3>Naive · KMP · Rabin–Karp</h3>
+        <div class="desc">Slide a pattern across a text three different ways: brute force, prefix-function-guided skipping, and rolling-hash pre-filtering.</div>
+        <div class="badge-row">
+          <span class="badge b-cyan">O(n·m)</span>
+          <span class="badge b-violet">O(n+m)</span>
+          <span class="badge b-amber">rolling hash</span>
+        </div>
+        <div class="enter-row">ENTER MODULE <span class="arrow">→</span></div>
+      </div>
+    </div>
+
+    <div class="node-grid">
+      <div class="node-card" onclick="showView('mst')">
+        <div class="node-index">EXPERIMENT 03 · GRAPH · MINIMUM SPANNING TREE</div>
+        <h3>Kruskal's vs. Prim's Algorithm</h3>
+        <div class="desc">Connect all vertices in a weighted graph at minimum total cost — one algorithm sorts edges globally, the other grows a tree locally with a min-heap.</div>
+        <div class="badge-row">
+          <span class="badge b-cyan">O(E log E)</span>
+          <span class="badge b-violet">O(E log V)</span>
+          <span class="badge b-green">union-find</span>
+        </div>
+        <div class="enter-row">ENTER MODULE <span class="arrow">→</span></div>
+      </div>
+
+      <div class="node-card" onclick="showView('dijkstra')">
+        <div class="node-index">EXPERIMENT 04 · GRAPH · SHORTEST PATH</div>
+        <h3>Dijkstra's Algorithm</h3>
+        <div class="desc">Find the cheapest route from a single source to every other vertex, popping the closest unfinished vertex from a min-heap at each step.</div>
+        <div class="badge-row">
+          <span class="badge b-cyan">O((V+E) log V)</span>
+          <span class="badge b-violet">space O(V)</span>
+          <span class="badge b-green">min-heap</span>
+        </div>
+        <div class="enter-row">ENTER MODULE <span class="arrow">→</span></div>
+      </div>
+    </div>
+
+    <div class="node-grid" style="grid-template-columns:1fr;">
+      <div class="node-card" onclick="showView('compare')">
+        <div class="node-index">GLOBAL VIEW</div>
+        <h3>Comparison Cost Readout</h3>
+        <div class="desc">See how many comparisons or operations each algorithm actually spent on the sample inputs from the source programs, side by side.</div>
+        <div class="enter-row">OPEN <span class="arrow">→</span></div>
+      </div>
+    </div>
+
+    <div class="hub-footer-note">SYSTEM ONLINE · 4 EXPERIMENTS DETECTED · STEP DATA GENERATED LIVE FROM SOURCE LOGIC</div>
+  </section>
+
+  <!-- ===================== MODULE 1: SEARCH ===================== -->
+  <section class="view" id="view-search">
+    <div class="module-head">
+      <div class="module-eyebrow">Experiment 01 / Array Search</div>
+      <h2>Interpolation vs. Binary Search</h2>
+      <p class="aim">Aim: locate a target value in a sorted array. Binary search always checks the midpoint; interpolation search instead estimates where the target is likely to be, based on its value relative to the low and high bounds — like flipping to the right page of a dictionary instead of always opening to the middle.</p>
+    </div>
+
+    <div class="algo-tabs">
+      <button class="algo-tab active" id="tab-interp" onclick="setSearchAlgo('interp')">Interpolation Search</button>
+      <button class="algo-tab" id="tab-binary" onclick="setSearchAlgo('binary')">Binary Search</button>
+    </div>
+
+    <div class="panel-grid">
+      <div class="panel">
+        <div class="panel-title">Live Array</div>
+        <div class="viz-surface"><div class="array-row" id="arrayRow"></div></div>
+        <div class="caption-box" id="searchCaption">Press play or step forward to begin.</div>
+        <div class="stat-row">
+          <div class="stat">Target<b id="statTarget">—</b></div>
+          <div class="stat">Comparisons<b id="statComparisons">0</b></div>
+          <div class="stat">Result<b id="statResult">pending</b></div>
+        </div>
+        <div class="controls">
+          <button class="ctrl-btn" id="btnBack" onclick="stepSearch(-1)" title="Step back">◂</button>
+          <button class="ctrl-btn play" id="btnPlay" onclick="togglePlaySearch()" title="Play / Pause">▶</button>
+          <button class="ctrl-btn" id="btnFwd" onclick="stepSearch(1)" title="Step forward">▸</button>
+          <span class="step-counter" id="searchStepCounter">Step 0 / 0</span>
+          <button class="reset-btn" onclick="resetSearch()">⟲ Reset</button>
+          <div class="speed-wrap">Speed <input type="range" id="searchSpeed" min="300" max="2000" value="1000" step="100"></div>
+        </div>
+        <div class="complexity-badges" id="searchComplexity"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Synced Pseudocode</div>
+        <div class="code-panel" id="searchCode"></div>
+        <details class="collapsible">
+          <summary>Result &amp; Inference</summary>
+          <div class="body" id="searchInference"></div>
+        </details>
+      </div>
+    </div>
+
+    <div class="prevnext">
+      <button class="pn-btn" onclick="showView('hub')">← Hub</button>
+      <button class="pn-btn" onclick="showView('string')">Next: String Matching →</button>
+    </div>
+  </section>
+
+  <!-- ===================== MODULE 2: STRING MATCHING ===================== -->
+  <section class="view" id="view-string">
+    <div class="module-head">
+      <div class="module-eyebrow">Experiment 02 / String Matching</div>
+      <h2>Naive · KMP · Rabin–Karp</h2>
+      <p class="aim">Aim: find every occurrence of a short pattern inside a longer text. The three algorithms differ in how much wasted work they avoid after a mismatch — from none (naive), to skipping using a precomputed prefix table (KMP), to filtering candidate windows with a rolling hash (Rabin–Karp).</p>
+    </div>
+
+    <div class="algo-tabs">
+      <button class="algo-tab active" id="tab-naive" onclick="setStringAlgo('naive')">Naive Search</button>
+      <button class="algo-tab" id="tab-kmp" onclick="setStringAlgo('kmp')">KMP</button>
+      <button class="algo-tab" id="tab-rk" onclick="setStringAlgo('rk')">Rabin–Karp</button>
+    </div>
+
+    <div class="panel-grid">
+      <div class="panel">
+        <div class="panel-title">Text / Pattern Alignment</div>
+        <div class="viz-surface">
+          <div class="string-block">
+            <div>
+              <div class="string-row-label">Text</div>
+              <div class="char-row" id="textRow"></div>
+            </div>
+            <div>
+              <div class="string-row-label">Pattern</div>
+              <div class="char-row pattern-row" id="patternRow"></div>
+            </div>
+            <div id="lpsBlock" style="display:none;">
+              <div class="string-row-label">LPS Table (prefix-suffix lengths)</div>
+              <div class="lps-row" id="lpsRow"></div>
+            </div>
+          </div>
+        </div>
+        <div class="caption-box" id="stringCaption">Press play or step forward to begin.</div>
+        <div class="stat-row">
+          <div class="stat">Comparisons<b id="stringStatComparisons">0</b></div>
+          <div class="stat">Matches found<b id="stringStatMatches">0</b></div>
+        </div>
+        <div class="controls">
+          <button class="ctrl-btn" id="sBtnBack" onclick="stepString(-1)" title="Step back">◂</button>
+          <button class="ctrl-btn play" id="sBtnPlay" onclick="togglePlayString()" title="Play / Pause">▶</button>
+          <button class="ctrl-btn" id="sBtnFwd" onclick="stepString(1)" title="Step forward">▸</button>
+          <span class="step-counter" id="stringStepCounter">Step 0 / 0</span>
+          <button class="reset-btn" onclick="resetString()">⟲ Reset</button>
+          <div class="speed-wrap">Speed <input type="range" id="stringSpeed" min="150" max="1200" value="500" step="50"></div>
+        </div>
+        <div class="complexity-badges" id="stringComplexity"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Synced Pseudocode</div>
+        <div class="code-panel" id="stringCode"></div>
+        <details class="collapsible">
+          <summary>Result &amp; Inference</summary>
+          <div class="body" id="stringInference"></div>
+        </details>
+      </div>
+    </div>
+
+    <div class="prevnext">
+      <button class="pn-btn" onclick="showView('search')">← Search Algorithms</button>
+      <button class="pn-btn" onclick="showView('mst')">Next: Minimum Spanning Tree →</button>
+    </div>
+  </section>
+
+  <!-- ===================== MODULE 3: MST (KRUSKAL / PRIM) ===================== -->
+  <section class="view" id="view-mst">
+    <div class="module-head">
+      <div class="module-eyebrow">Experiment 03 / Graph — Minimum Spanning Tree</div>
+      <h2>Kruskal's vs. Prim's Algorithm</h2>
+      <p class="aim">Aim: connect every vertex in a weighted graph using the cheapest possible set of edges, with no cycles. Kruskal's works globally — sort all edges, greedily add the cheapest one that doesn't create a cycle. Prim's works locally — grow one connected tree outward, always adding the cheapest edge leaving the current tree.</p>
+    </div>
+
+    <div class="algo-tabs">
+      <button class="algo-tab active" id="tab-kruskal" onclick="setMstAlgo('kruskal')">Kruskal's Algorithm</button>
+      <button class="algo-tab" id="tab-prim" onclick="setMstAlgo('prim')">Prim's Algorithm</button>
+    </div>
+
+    <div class="panel-grid">
+      <div class="panel">
+        <div class="panel-title">Graph Canvas</div>
+        <div class="viz-surface"><svg id="mstSvg" viewBox="0 0 640 420" style="width:100%; max-width:640px; height:auto;"></svg></div>
+        <div class="caption-box" id="mstCaption">Press play or step forward to begin.</div>
+        <div class="stat-row">
+          <div class="stat">Edges considered<b id="mstStatConsidered">0</b></div>
+          <div class="stat">MST edges<b id="mstStatEdges">0</b></div>
+          <div class="stat">Running cost<b id="mstStatCost">0</b></div>
+        </div>
+        <div class="controls">
+          <button class="ctrl-btn" id="mBtnBack" onclick="stepMst(-1)" title="Step back">◂</button>
+          <button class="ctrl-btn play" id="mBtnPlay" onclick="togglePlayMst()" title="Play / Pause">▶</button>
+          <button class="ctrl-btn" id="mBtnFwd" onclick="stepMst(1)" title="Step forward">▸</button>
+          <span class="step-counter" id="mstStepCounter">Step 0 / 0</span>
+          <button class="reset-btn" onclick="resetMst()">⟲ Reset</button>
+          <div class="speed-wrap">Speed <input type="range" id="mstSpeed" min="300" max="2000" value="900" step="100"></div>
+        </div>
+        <div class="complexity-badges" id="mstComplexity"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Synced Pseudocode</div>
+        <div class="code-panel" id="mstCode"></div>
+        <div class="collapsible" style="border-top:1px solid var(--line); margin-top:16px; padding-top:14px;">
+          <div class="panel-title" style="margin-bottom:10px;">MST Edges So Far</div>
+          <table class="compare-table" id="mstEdgeTable"></table>
+        </div>
+        <details class="collapsible">
+          <summary>Result &amp; Inference</summary>
+          <div class="body" id="mstInference"></div>
+        </details>
+      </div>
+    </div>
+
+    <div class="prevnext">
+      <button class="pn-btn" onclick="showView('string')">← String Matching</button>
+      <button class="pn-btn" onclick="showView('dijkstra')">Next: Dijkstra's Algorithm →</button>
+    </div>
+  </section>
+
+  <!-- ===================== MODULE 4: DIJKSTRA ===================== -->
+  <section class="view" id="view-dijkstra">
+    <div class="module-head">
+      <div class="module-eyebrow">Experiment 04 / Graph — Shortest Path</div>
+      <h2>Dijkstra's Algorithm</h2>
+      <p class="aim">Aim: find the shortest distance from a single source vertex to every other vertex in a weighted graph. A min-heap always pops the closest unfinished vertex next, then "relaxes" its outgoing edges — updating a neighbor's distance if a shorter path was just discovered.</p>
+    </div>
+
+    <div class="panel-grid">
+      <div class="panel">
+        <div class="panel-title">Graph Canvas — source vertex 0</div>
+        <div class="viz-surface"><svg id="dijkstraSvg" viewBox="0 0 640 380" style="width:100%; max-width:640px; height:auto;"></svg></div>
+        <div class="caption-box" id="dijkstraCaption">Press play or step forward to begin.</div>
+        <div class="stat-row">
+          <div class="stat">Vertices finalized<b id="dijkstraStatVisited">0</b></div>
+          <div class="stat">Relaxations<b id="dijkstraStatRelax">0</b></div>
+        </div>
+        <div class="controls">
+          <button class="ctrl-btn" id="dBtnBack" onclick="stepDijkstra(-1)" title="Step back">◂</button>
+          <button class="ctrl-btn play" id="dBtnPlay" onclick="togglePlayDijkstra()" title="Play / Pause">▶</button>
+          <button class="ctrl-btn" id="dBtnFwd" onclick="stepDijkstra(1)" title="Step forward">▸</button>
+          <span class="step-counter" id="dijkstraStepCounter">Step 0 / 0</span>
+          <button class="reset-btn" onclick="resetDijkstra()">⟲ Reset</button>
+          <div class="speed-wrap">Speed <input type="range" id="dijkstraSpeed" min="300" max="2000" value="900" step="100"></div>
+        </div>
+        <div class="complexity-badges" id="dijkstraComplexity"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Synced Pseudocode</div>
+        <div class="code-panel" id="dijkstraCode"></div>
+        <div class="collapsible" style="border-top:1px solid var(--line); margin-top:16px; padding-top:14px;">
+          <div class="panel-title" style="margin-bottom:10px;">Distance Table</div>
+          <table class="compare-table" id="dijkstraDistTable"></table>
+        </div>
+        <details class="collapsible">
+          <summary>Result &amp; Inference</summary>
+          <div class="body" id="dijkstraInference"></div>
+        </details>
+      </div>
+    </div>
+
+    <div class="prevnext">
+      <button class="pn-btn" onclick="showView('mst')">← Minimum Spanning Tree</button>
+      <button class="pn-btn" onclick="showView('compare')">Next: Comparison View →</button>
+    </div>
+  </section>
+
+  <!-- ===================== COMPARISON VIEW ===================== -->
+  <section class="view" id="view-compare">
+    <div class="module-head">
+      <div class="module-eyebrow">Global View</div>
+      <h2>Comparison Cost Readout</h2>
+      <p class="aim">Actual comparison counts recorded while running each algorithm on the sample inputs defined in the source programs.</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Array Search — array of 12 sorted values, target = 35</div>
+      <table class="compare-table" id="compareSearchTable"></table>
+    </div>
+
+    <div class="panel" style="margin-top:18px;">
+      <div class="panel-title">String Matching — text length 16, pattern "AABA"</div>
+      <table class="compare-table" id="compareStringTable"></table>
+    </div>
+
+    <div class="panel" style="margin-top:18px;">
+      <div class="panel-title">Minimum Spanning Tree — 7 vertices, 11 edges</div>
+      <table class="compare-table" id="compareMstTable"></table>
+    </div>
+
+    <div class="panel" style="margin-top:18px;">
+      <div class="panel-title">Dijkstra's Algorithm — 6 vertices from source 0</div>
+      <table class="compare-table" id="compareDijkstraTable"></table>
+    </div>
+
+    <div class="prevnext">
+      <button class="pn-btn" onclick="showView('dijkstra')">← Dijkstra's Algorithm</button>
+      <button class="pn-btn" onclick="showView('hub')">⌂ Back to Hub</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* =========================================================================
+   NAVIGATION
+   ========================================================================= */
+function showView(name){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  document.getElementById('hubBtn').classList.toggle('visible', name !== 'hub');
+  window.scrollTo({top:0, behavior:'smooth'});
+  if(name==='search') initSearchModule();
+  if(name==='string') initStringModule();
+  if(name==='mst') initMstModule();
+  if(name==='dijkstra') initDijkstraModule();
+  if(name==='compare') initCompareView();
+}
+document.addEventListener('keydown', (e)=>{
+  const activeId = document.querySelector('.view.active').id;
+  if(activeId==='view-search'){
+    if(e.key==='ArrowRight') stepSearch(1);
+    if(e.key==='ArrowLeft') stepSearch(-1);
+    if(e.key===' '){ e.preventDefault(); togglePlaySearch(); }
+  }
+  if(activeId==='view-string'){
+    if(e.key==='ArrowRight') stepString(1);
+    if(e.key==='ArrowLeft') stepString(-1);
+    if(e.key===' '){ e.preventDefault(); togglePlayString(); }
+  }
+  if(activeId==='view-mst'){
+    if(e.key==='ArrowRight') stepMst(1);
+    if(e.key==='ArrowLeft') stepMst(-1);
+    if(e.key===' '){ e.preventDefault(); togglePlayMst(); }
+  }
+  if(activeId==='view-dijkstra'){
+    if(e.key==='ArrowRight') stepDijkstra(1);
+    if(e.key==='ArrowLeft') stepDijkstra(-1);
+    if(e.key===' '){ e.preventDefault(); togglePlayDijkstra(); }
+  }
+});
+
+/* =========================================================================
+   MODULE 1 — SEARCH ALGORITHMS  (ported from daa1.py)
+   ========================================================================= */
+const SEARCH_ARR = [2, 5, 10, 15, 23, 35, 48, 60, 75, 90, 105, 120];
+const SEARCH_TARGET = 35;
+
+function interpolationSteps(arr, target){
+  const steps = [];
+  let low = 0, high = arr.length - 1, comparisons = 0;
+  while (low <= high && arr[low] <= target && target <= arr[high]){
+    comparisons++;
+    if (low === high){
+      const found = arr[low] === target;
+      steps.push({code:'base', low, high, pos:low, comparisons, found, done:true,
+        message: found ? `Only one candidate left: arr[${low}] = ${arr[low]} — it matches the target.`
+                        : `Only one candidate left: arr[${low}] = ${arr[low]} — no match. Target not present.`});
+      return steps;
+    }
+    const pos = low + Math.floor(((target - arr[low]) * (high - low)) / (arr[high] - arr[low]));
+    steps.push({code:'formula', low, high, pos, comparisons,
+      message:`Estimate position using the interpolation formula → pos = ${pos} (proportional to where ${target} should sit between arr[${low}]=${arr[low]} and arr[${high}]=${arr[high]}).`});
+    if (arr[pos] === target){
+      steps.push({code:'match', low, high, pos, comparisons, found:true, done:true,
+        message:`arr[${pos}] = ${arr[pos]} equals the target. Found it in ${comparisons} comparison${comparisons>1?'s':''}.`});
+      return steps;
+    } else if (arr[pos] < target){
+      steps.push({code:'lt', low, high, pos, comparisons,
+        message:`arr[${pos}] = ${arr[pos]} is less than the target → search the right side: low becomes pos + 1 = ${pos+1}.`});
+      low = pos + 1;
+    } else {
+      steps.push({code:'gt', low, high, pos, comparisons,
+        message:`arr[${pos}] = ${arr[pos]} is greater than the target → search the left side: high becomes pos − 1 = ${pos-1}.`});
+      high = pos - 1;
+    }
+  }
+  steps.push({code:'notfound', low, high, comparisons, found:false, done:true,
+    message:`Search space exhausted (low > high, or target outside [arr[low], arr[high]]). Target not found.`});
+  return steps;
+}
+
+function binarySteps(arr, target){
+  const steps = [];
+  let low = 0, high = arr.length - 1, comparisons = 0;
+  while (low <= high){
+    comparisons++;
+    const mid = Math.floor((low + high) / 2);
+    if (arr[mid] === target){
+      steps.push({code:'match', low, high, pos:mid, comparisons, found:true, done:true,
+        message:`arr[${mid}] = ${arr[mid]} equals the target. Found it in ${comparisons} comparison${comparisons>1?'s':''}.`});
+      return steps;
+    } else if (arr[mid] < target){
+      steps.push({code:'lt', low, high, pos:mid, comparisons,
+        message:`arr[${mid}] = ${arr[mid]} is less than the target → search the right half: low becomes mid + 1 = ${mid+1}.`});
+      low = mid + 1;
+    } else {
+      steps.push({code:'gt', low, high, pos:mid, comparisons,
+        message:`arr[${mid}] = ${arr[mid]} is greater than the target → search the left half: high becomes mid − 1 = ${mid-1}.`});
+      high = mid - 1;
+    }
+  }
+  steps.push({code:'notfound', low, high, comparisons, found:false, done:true,
+    message:`Search space exhausted (low > high). Target not found.`});
+  return steps;
+}
+
+const SEARCH_CODE = {
+  interp: [
+    {id:'header', text:'low, high = 0, len(arr) - 1'},
+    {id:'loop-check', text:'while low <= high and arr[low] <= target <= arr[high]:'},
+    {id:'base', text:'    if low == high: check single candidate'},
+    {id:'formula', text:'    pos = low + (target-arr[low])*(high-low) // (arr[high]-arr[low])'},
+    {id:'match', text:'    if arr[pos] == target: return pos'},
+    {id:'lt', text:'    elif arr[pos] < target: low = pos + 1'},
+    {id:'gt', text:'    else: high = pos - 1'},
+    {id:'notfound', text:'return -1'},
+  ],
+  binary: [
+    {id:'header', text:'low, high = 0, len(arr) - 1'},
+    {id:'loop-check', text:'while low <= high:'},
+    {id:'formula', text:'    mid = (low + high) // 2'},
+    {id:'match', text:'    if arr[mid] == target: return mid'},
+    {id:'lt', text:'    elif arr[mid] < target: low = mid + 1'},
+    {id:'gt', text:'    else: high = mid - 1'},
+    {id:'notfound', text:'return -1'},
+  ]
+};
+
+const SEARCH_COMPLEXITY = {
+  interp: [
+    {cls:'b-cyan', text:'best O(1)'}, {cls:'b-violet', text:'avg O(log log n)'},
+    {cls:'b-amber', text:'worst O(n)'}, {cls:'b-green', text:'space O(1)'}
+  ],
+  binary: [
+    {cls:'b-cyan', text:'best O(1)'}, {cls:'b-violet', text:'avg O(log n)'},
+    {cls:'b-amber', text:'worst O(log n)'}, {cls:'b-green', text:'space O(1)'}
+  ]
+};
+
+let searchAlgo = 'interp';
+let searchSteps = [];
+let searchIdx = -1;
+let searchPlaying = false;
+let searchTimer = null;
+
+function setSearchAlgo(algo){
+  searchAlgo = algo;
+  document.getElementById('tab-interp').classList.toggle('active', algo==='interp');
+  document.getElementById('tab-binary').classList.toggle('active', algo==='binary');
+  resetSearch();
+}
+
+function initSearchModule(){
+  document.getElementById('statTarget').textContent = SEARCH_TARGET;
+  resetSearch();
+}
+
+function resetSearch(){
+  pauseSearch();
+  searchSteps = searchAlgo === 'interp' ? interpolationSteps(SEARCH_ARR, SEARCH_TARGET) : binarySteps(SEARCH_ARR, SEARCH_TARGET);
+  searchIdx = -1;
+  renderCodePanel('searchCode', SEARCH_CODE[searchAlgo], null);
+  renderComplexity('searchComplexity', SEARCH_COMPLEXITY[searchAlgo]);
+  renderSearchStep();
+}
+
+function renderComplexity(elId, list){
+  const el = document.getElementById(elId);
+  el.innerHTML = list.map(b=>`<span class="badge ${b.cls}">${b.text}</span>`).join('');
+}
+
+function renderCodePanel(elId, lines, activeId){
+  const el = document.getElementById(elId);
+  el.innerHTML = lines.map(l=>`<div class="code-line${l.id===activeId?' hl':''}">${escapeHtml(l.text)}</div>`).join('');
+}
+function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderSearchStep(){
+  const total = searchSteps.length;
+  const step = searchIdx >= 0 ? searchSteps[searchIdx] : null;
+  document.getElementById('searchStepCounter').textContent = `Step ${searchIdx+1} / ${total}`;
+  document.getElementById('btnBack').disabled = searchIdx <= 0;
+  document.getElementById('btnFwd').disabled = searchIdx >= total-1;
+
+  document.getElementById('searchCaption').textContent = step ? step.message : 'Press play or step forward to begin.';
+  document.getElementById('statComparisons').textContent = step ? step.comparisons : 0;
+  document.getElementById('statResult').textContent = step && step.done ? (step.found ? 'FOUND ✓' : 'NOT FOUND') : 'pending';
+  document.getElementById('statResult').style.color = step && step.done ? (step.found ? 'var(--green)' : 'var(--red)') : 'var(--cyan)';
+
+  renderCodePanel('searchCode', SEARCH_CODE[searchAlgo], step ? step.code : null);
+
+  const row = document.getElementById('arrayRow');
+  row.innerHTML = SEARCH_ARR.map((val, i)=>{
+    let classes = 'cell';
+    let markers = '';
+    if(step){
+      const inRange = i >= step.low && i <= step.high;
+      if(!inRange) classes += ' out-of-range';
+      if(i === step.pos){
+        classes += step.done ? (step.found ? ' hit' : ' pointer-active') : ' pointer-active';
+        if(step.done && !step.found && i===step.pos) classes += ' miss';
+      }
+      const marks = [];
+      if(i === step.low) marks.push('<span class="marker m-low">L</span>');
+      if(i === step.high) marks.push('<span class="marker m-high">H</span>');
+      if(i === step.pos) marks.push(`<span class="marker m-pos">${searchAlgo==='interp'?'P':'M'}</span>`);
+      if(marks.length) markers = `<div class="cell-markers">${marks.join('')}</div>`;
+    }
+    return `<div class="${classes}">${markers}${val}</div>`;
+  }).join('');
+
+  const inf = document.getElementById('searchInference');
+  inf.innerHTML = searchAlgo === 'interp'
+    ? `Interpolation search reached the target using a value-proportional estimate rather than always bisecting. On uniformly distributed sorted data this converges much faster than binary search, but its worst case degrades to O(n) when values are unevenly spaced (e.g. highly skewed distributions).`
+    : `Binary search always halves the search space regardless of value distribution, giving a predictable O(log n) bound in every case — the trade-off for not exploiting how the data is spread out.`;
+}
+
+function stepSearch(dir){
+  const next = searchIdx + dir;
+  if(next < -1 || next >= searchSteps.length) return;
+  searchIdx = Math.max(0, next);
+  if(dir < 0 && searchIdx===0 && next<0) searchIdx = -1;
+  renderSearchStep();
+  if(searchIdx >= searchSteps.length - 1) pauseSearch();
+}
+
+function togglePlaySearch(){
+  if(searchPlaying){ pauseSearch(); return; }
+  if(searchIdx >= searchSteps.length - 1) searchIdx = -1;
+  searchPlaying = true;
+  document.getElementById('btnPlay').textContent = '❚❚';
+  const tick = ()=>{
+    if(!searchPlaying) return;
+    if(searchIdx >= searchSteps.length - 1){ pauseSearch(); return; }
+    searchIdx++;
+    renderSearchStep();
+    const speed = parseInt(document.getElementById('searchSpeed').value, 10);
+    searchTimer = setTimeout(tick, speed);
+  };
+  const speed = parseInt(document.getElementById('searchSpeed').value, 10);
+  searchTimer = setTimeout(tick, speed);
+}
+function pauseSearch(){
+  searchPlaying = false;
+  clearTimeout(searchTimer);
+  document.getElementById('btnPlay').textContent = '▶';
+}
+
+/* =========================================================================
+   MODULE 2 — STRING MATCHING  (ported from daa2.py)
+   ========================================================================= */
+const STR_TEXT = 'AABAACAADAABAABA';
+const STR_PATTERN = 'AABA';
+
+function naiveSteps(text, pattern){
+  const steps = [];
+  let comparisons = 0;
+  const n = text.length, m = pattern.length;
+  for (let i = 0; i <= n - m; i++){
+    let j = 0, matched = true;
+    for (j = 0; j < m; j++){
+      comparisons++;
+      if (text[i+j] !== pattern[j]){
+        steps.push({code:'compare', i, j, comparisons, kind:'mismatch',
+          message:`Window i=${i}: text[${i+j}]='${text[i+j]}' ≠ pattern[${j}]='${pattern[j]}'. Slide the window one step right.`});
+        matched = false;
+        break;
+      } else {
+        steps.push({code:'compare', i, j, comparisons, kind:'match',
+          message:`Window i=${i}: text[${i+j}]='${text[i+j]}' = pattern[${j}]='${pattern[j]}'. Keep comparing.`});
+      }
+    }
+    if (matched){
+      steps.push({code:'append', i, j:m-1, comparisons, kind:'full-match',
+        message:`All ${m} characters matched — full match found at index ${i}.`});
+    }
+  }
+  steps.push({code:'return', comparisons, kind:'done',
+    message:`Naive search complete. Every window checked with no skipping. Total comparisons: ${comparisons}.`});
+  return steps;
+}
+
+function computeLPS(pattern){
+  const m = pattern.length;
+  const lps = new Array(m).fill(0);
+  let length = 0, i = 1;
+  while (i < m){
+    if (pattern[i] === pattern[length]){
+      length++; lps[i] = length; i++;
+    } else if (length !== 0){
+      length = lps[length - 1];
+    } else {
+      lps[i] = 0; i++;
+    }
+  }
+  return lps;
+}
+
+function kmpSteps(text, pattern){
+  const lps = computeLPS(pattern);
+  const steps = [];
+  let comparisons = 0;
+  const n = text.length, m = pattern.length;
+  let i = 0, j = 0;
+  while (i < n){
+    comparisons++;
+    if (pattern[j] === text[i]){
+      steps.push({code:'match-if', i, j, comparisons, kind:'match',
+        message:`text[${i}]='${text[i]}' = pattern[${j}]='${pattern[j]}'. Advance both pointers.`});
+      i++; j++;
+    } else {
+      steps.push({code:'match-if', i, j, comparisons, kind:'mismatch',
+        message:`text[${i}]='${text[i]}' ≠ pattern[${j}]='${pattern[j]}'.`});
+    }
+    if (j === m){
+      steps.push({code:'full-match', i, j, comparisons, kind:'full-match',
+        message:`Full match found at index ${i - j}. Shift using lps[${j-1}] = ${lps[j-1]} — no need to re-check those characters.`});
+      j = lps[j - 1];
+    } else if (i < n && pattern[j] !== text[i]){
+      if (j !== 0){
+        steps.push({code:'shift', i, j, comparisons, kind:'shift',
+          message:`Mismatch after a partial match of length ${j}. Instead of restarting, jump j to lps[${j-1}] = ${lps[j-1]} — the prefix table already tells us that much still lines up.`});
+        j = lps[j - 1];
+      } else {
+        i++;
+      }
+    }
+  }
+  steps.push({code:'return', comparisons, kind:'done',
+    message:`KMP search complete. The prefix table let us skip re-comparing known-matching characters. Total comparisons: ${comparisons}.`});
+  return {steps, lps};
+}
+
+function rabinKarpSteps(text, pattern, q=101){
+  const d = 256;
+  const n = text.length, m = pattern.length;
+  let h = 1;
+  for (let k = 0; k < m - 1; k++) h = (h * d) % q;
+  let pHash = 0, tHash = 0;
+  const steps = [];
+  let comparisons = 0;
+  for (let k = 0; k < m; k++){
+    pHash = (d * pHash + pattern.charCodeAt(k)) % q;
+    tHash = (d * tHash + text.charCodeAt(k)) % q;
+  }
+  for (let s = 0; s <= n - m; s++){
+    if (pHash === tHash){
+      steps.push({code:'hash-check', s, comparisons, kind:'hash-match',
+        message:`Window s=${s}: rolling hash matches pattern hash (${tHash}). Verifying characters one by one to rule out a collision.`});
+      let all = true;
+      for (let k = 0; k < m; k++){
+        comparisons++;
+        if (text[s+k] !== pattern[k]){
+          steps.push({code:'verify', s, k, comparisons, kind:'mismatch',
+            message:`Verification failed: text[${s+k}]='${text[s+k]}' ≠ pattern[${k}]='${pattern[k]}'. Hash collision — move to next window.`});
+          all = false;
+          break;
+        } else {
+          steps.push({code:'verify', s, k, comparisons, kind:'match',
+            message:`text[${s+k}]='${text[s+k]}' = pattern[${k}]='${pattern[k]}'.`});
+        }
+      }
+      if (all) steps.push({code:'append', s, k:m-1, comparisons, kind:'full-match',
+        message:`All characters verified — confirmed match at index ${s}.`});
+    } else {
+      steps.push({code:'hash-check', s, comparisons, kind:'hash-mismatch',
+        message:`Window s=${s}: rolling hash (${tHash}) ≠ pattern hash (${pHash}). Skip character-by-character verification entirely.`});
+    }
+    if (s < n - m){
+      tHash = (d * (tHash - text.charCodeAt(s) * h) + text.charCodeAt(s + m)) % q;
+      if (tHash < 0) tHash += q;
+    }
+  }
+  steps.push({code:'return', comparisons, kind:'done',
+    message:`Rabin–Karp complete. Hash comparisons are O(1) each and only real character checks count toward "comparisons". Total character comparisons: ${comparisons}.`});
+  return steps;
+}
+
+const STRING_CODE = {
+  naive: [
+    {id:'header', text:'for i in range(n - m + 1):'},
+    {id:'compare', text:'    for j in range(m):'},
+    {id:'compare', text:'        if text[i+j] != pattern[j]: break'},
+    {id:'append', text:'    if j == m: matches.append(i)'},
+    {id:'return', text:'return matches, comparisons'},
+  ],
+  kmp: [
+    {id:'header', text:'lps = compute_lps(pattern)   # precomputed once'},
+    {id:'match-if', text:'if pattern[j] == text[i]: i += 1; j += 1'},
+    {id:'full-match', text:'if j == m: matches.append(i-j); j = lps[j-1]'},
+    {id:'shift', text:'elif i<n and pattern[j] != text[i]:'},
+    {id:'shift', text:'    if j != 0: j = lps[j-1]'},
+    {id:'shift', text:'    else: i += 1'},
+    {id:'return', text:'return matches, comparisons'},
+  ],
+  rk: [
+    {id:'header', text:'p_hash, t_hash = hash(pattern), hash(text[0:m])'},
+    {id:'hash-check', text:'for s in range(n - m + 1):'},
+    {id:'hash-check', text:'    if p_hash == t_hash:'},
+    {id:'verify', text:'        for k in range(m): compare text[s+k], pattern[k]'},
+    {id:'append', text:'        else: matches.append(s)'},
+    {id:'return', text:'return matches, comparisons'},
+  ]
+};
+
+const STRING_COMPLEXITY = {
+  naive: [{cls:'b-cyan', text:'best O(n)'}, {cls:'b-amber', text:'worst O(n·m)'}, {cls:'b-green', text:'space O(1)'}],
+  kmp: [{cls:'b-cyan', text:'O(n+m) always'}, {cls:'b-violet', text:'preprocess O(m)'}, {cls:'b-green', text:'space O(m)'}],
+  rk: [{cls:'b-cyan', text:'avg O(n+m)'}, {cls:'b-amber', text:'worst O(n·m)'}, {cls:'b-green', text:'space O(1)'}]
+};
+
+let stringAlgo = 'naive';
+let stringSteps = [];
+let stringLPS = null;
+let stringIdx = -1;
+let stringPlaying = false;
+let stringTimer = null;
+
+function setStringAlgo(algo){
+  stringAlgo = algo;
+  document.getElementById('tab-naive').classList.toggle('active', algo==='naive');
+  document.getElementById('tab-kmp').classList.toggle('active', algo==='kmp');
+  document.getElementById('tab-rk').classList.toggle('active', algo==='rk');
+  document.getElementById('lpsBlock').style.display = algo==='kmp' ? 'block' : 'none';
+  resetString();
+}
+
+function initStringModule(){
+  resetString();
+}
+
+function resetString(){
+  pauseString();
+  stringLPS = null;
+  if (stringAlgo === 'naive'){ stringSteps = naiveSteps(STR_TEXT, STR_PATTERN); }
+  else if (stringAlgo === 'kmp'){ const r = kmpSteps(STR_TEXT, STR_PATTERN); stringSteps = r.steps; stringLPS = r.lps; }
+  else { stringSteps = rabinKarpSteps(STR_TEXT, STR_PATTERN); }
+  stringIdx = -1;
+  renderCodePanel('stringCode', STRING_CODE[stringAlgo], null);
+  renderComplexity('stringComplexity', STRING_COMPLEXITY[stringAlgo]);
+  if (stringAlgo === 'kmp' && stringLPS) renderLPS(null);
+  renderStringStep();
+}
+
+function renderLPS(activeIdx){
+  const row = document.getElementById('lpsRow');
+  row.innerHTML = STR_PATTERN.split('').map((ch,i)=>{
+    return `<div class="lps-cell${i===activeIdx?' cur':''}">${stringLPS[i]}</div>`;
+  }).join('');
+}
+
+function renderStringStep(){
+  const total = stringSteps.length;
+  const step = stringIdx >= 0 ? stringSteps[stringIdx] : null;
+  document.getElementById('stringStepCounter').textContent = `Step ${stringIdx+1} / ${total}`;
+  document.getElementById('sBtnBack').disabled = stringIdx <= 0;
+  document.getElementById('sBtnFwd').disabled = stringIdx >= total-1;
+
+  document.getElementById('stringCaption').textContent = step ? step.message : 'Press play or step forward to begin.';
+  document.getElementById('stringStatComparisons').textContent = step ? step.comparisons : 0;
+
+  let matchCount = 0;
+  for (let k=0; k<=stringIdx; k++){ if (stringSteps[k] && stringSteps[k].kind==='full-match') matchCount++; }
+  document.getElementById('stringStatMatches').textContent = matchCount;
+
+  renderCodePanel('stringCode', STRING_CODE[stringAlgo], step ? step.code : null);
+
+  const windowStart = step ? (step.i !== undefined ? step.i : step.s) : undefined;
+  const curOffset = step ? (step.j !== undefined ? step.j : step.k) : undefined;
+  const m = STR_PATTERN.length;
+
+  const textRow = document.getElementById('textRow');
+  textRow.innerHTML = STR_TEXT.split('').map((ch,idx)=>{
+    let cls = 'char-cell';
+    if (step && windowStart !== undefined){
+      const inWin = idx >= windowStart && idx < windowStart + m;
+      if (inWin) cls += ' in-window';
+      const curIdx = windowStart + (curOffset !== undefined ? curOffset : 0);
+      if (idx === curIdx && step.kind !== 'done' && step.kind !== 'hash-check' && step.kind !== 'hash-mismatch' && step.kind !== 'hash-match'){
+        cls += step.kind === 'mismatch' ? ' mismatch' : (step.kind==='match' || step.kind==='full-match' ? ' match' : ' cur');
+      } else if ((step.kind==='hash-match' || step.kind==='hash-mismatch') && inWin){
+        cls += step.kind==='hash-match' ? ' cur' : '';
+      }
+    }
+    return `<div class="${cls}">${ch}</div>`;
+  }).join('');
+
+  const patternRow = document.getElementById('patternRow');
+  const offsetPad = step && windowStart !== undefined ? windowStart : 0;
+  let padCells = '';
+  for (let p=0; p<offsetPad; p++) padCells += `<div class="char-cell" style="visibility:hidden;">·</div>`;
+  patternRow.innerHTML = padCells + STR_PATTERN.split('').map((ch,idx)=>{
+    let cls = 'char-cell in-window';
+    if (step && curOffset !== undefined && idx === curOffset && step.kind !== 'done' && step.kind !== 'hash-check' && step.kind !== 'hash-mismatch'){
+      cls += step.kind === 'mismatch' ? ' mismatch' : ' match';
+    }
+    return `<div class="${cls}">${ch}</div>`;
+  }).join('');
+
+  if (stringAlgo === 'kmp' && stringLPS){
+    const activeLpsIdx = step && step.code==='shift' ? step.j - 1 : null;
+    renderLPS(activeLpsIdx);
+  }
+
+  const inf = document.getElementById('stringInference');
+  inf.innerHTML = stringAlgo === 'naive'
+    ? `The naive approach re-checks every alignment from scratch, so a mismatch deep into a partial match still only slides the window by one — no information from the failed comparison is reused.`
+    : stringAlgo === 'kmp'
+    ? `KMP precomputes, for every prefix of the pattern, the length of the longest proper prefix that is also a suffix. On a mismatch, that table tells the algorithm exactly how far it can safely shift without skipping a possible match — giving linear O(n+m) time regardless of input.`
+    : `Rabin–Karp compares cheap rolling hashes first and only pays for character-by-character verification when hashes collide. With a well-chosen modulus, collisions are rare, so it behaves close to linear in practice — though a poor modulus can degrade it toward the naive algorithm's worst case.`;
+}
+
+function stepString(dir){
+  const next = stringIdx + dir;
+  if (next < -1 || next >= stringSteps.length) return;
+  stringIdx = Math.max(0, next);
+  if (dir < 0 && next < 0) stringIdx = -1;
+  renderStringStep();
+  if (stringIdx >= stringSteps.length - 1) pauseString();
+}
+
+function togglePlayString(){
+  if (stringPlaying){ pauseString(); return; }
+  if (stringIdx >= stringSteps.length - 1) stringIdx = -1;
+  stringPlaying = true;
+  document.getElementById('sBtnPlay').textContent = '❚❚';
+  const tick = ()=>{
+    if (!stringPlaying) return;
+    if (stringIdx >= stringSteps.length - 1){ pauseString(); return; }
+    stringIdx++;
+    renderStringStep();
+    const speed = parseInt(document.getElementById('stringSpeed').value, 10);
+    stringTimer = setTimeout(tick, speed);
+  };
+  const speed = parseInt(document.getElementById('stringSpeed').value, 10);
+  stringTimer = setTimeout(tick, speed);
+}
+function pauseString(){
+  stringPlaying = false;
+  clearTimeout(stringTimer);
+  document.getElementById('sBtnPlay').textContent = '▶';
+}
+
+/* =========================================================================
+   SHARED GRAPH LAYOUT + SVG RENDER HELPERS
+   ========================================================================= */
+function circleLayout(n, cx, cy, r){
+  const pts = [];
+  for (let i = 0; i < n; i++){
+    const angle = (-Math.PI / 2) + (2 * Math.PI * i / n);
+    pts.push({x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle)});
+  }
+  return pts;
+}
+
+function svgEl(tag, attrs){
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+
+/* Renders an (optionally directed) graph. edgeList: [{u,v,w,state}] state in
+   'idle'|'considering'|'accepted'|'rejected'. nodeStates: [{state}] state in
+   'idle'|'active'|'settled'. */
+function renderGraphSVG(svgId, positions, edgeList, nodeStates, opts){
+  opts = opts || {};
+  const svg = document.getElementById(svgId);
+  svg.innerHTML = '';
+  if (opts.directed){
+    const defs = svgEl('defs', {});
+    const marker = svgEl('marker', {id: svgId+'-arrow', viewBox:'0 0 10 10', refX:'9', refY:'5', markerWidth:'7', markerHeight:'7', orient:'auto-start-reverse'});
+    const arrowPath = svgEl('path', {d:'M 0 0 L 10 5 L 0 10 z', fill:'var(--cyan-dim)'});
+    marker.appendChild(arrowPath);
+    defs.appendChild(marker);
+    svg.appendChild(defs);
+  }
+  const colorFor = (state)=>{
+    if (state === 'accepted' || state === 'tree') return 'var(--green)';
+    if (state === 'considering' || state === 'active') return 'var(--cyan)';
+    if (state === 'rejected') return 'var(--red)';
+    return 'rgba(127,147,173,0.35)';
+  };
+  // edges first (under nodes)
+  edgeList.forEach(e=>{
+    const a = positions[e.u], b = positions[e.v];
+    const stroke = colorFor(e.state);
+    const line = svgEl('line', {
+      x1:a.x, y1:a.y, x2:b.x, y2:b.y, stroke, 'stroke-width': (e.state==='accepted'||e.state==='tree') ? 3.5 : (e.state==='considering' ? 3 : 1.6),
+      opacity: e.state==='idle' ? 0.55 : 1
+    });
+    if (e.state==='considering' || e.state==='accepted' || e.state==='tree'){
+      line.setAttribute('filter', 'none');
+      line.style.filter = `drop-shadow(0 0 5px ${stroke})`;
+    }
+    if (opts.directed) line.setAttribute('marker-end', `url(#${svgId}-arrow)`);
+    svg.appendChild(line);
+    // weight label
+    const mx = (a.x+b.x)/2, my = (a.y+b.y)/2;
+    const bg = svgEl('rect', {x:mx-11, y:my-9, width:22, height:16, rx:3, fill:'var(--void)', opacity:0.85});
+    svg.appendChild(bg);
+    const label = svgEl('text', {x:mx, y:my+3, 'text-anchor':'middle', 'font-family':'var(--mono)', 'font-size':'10.5', fill: e.state==='idle' ? 'var(--text-dim)' : stroke});
+    label.textContent = e.w;
+    svg.appendChild(label);
+  });
+  // nodes
+  positions.forEach((p,i)=>{
+    const st = (nodeStates[i] && nodeStates[i].state) || 'idle';
+    const fill = st==='settled' ? 'rgba(59,232,166,0.18)' : st==='active' ? 'rgba(78,227,255,0.2)' : 'rgba(255,255,255,0.03)';
+    const stroke = st==='settled' ? 'var(--green)' : st==='active' ? 'var(--cyan)' : 'var(--line)';
+    const circle = svgEl('circle', {cx:p.x, cy:p.y, r:19, fill, stroke, 'stroke-width':2});
+    if (st!=='idle') circle.style.filter = `drop-shadow(0 0 8px ${stroke})`;
+    svg.appendChild(circle);
+    const text = svgEl('text', {x:p.x, y:p.y+4, 'text-anchor':'middle', 'font-family':'var(--mono)', 'font-size':'13', 'font-weight':'700', fill: st==='idle' ? 'var(--text-dim)' : 'var(--text)'});
+    text.textContent = i;
+    svg.appendChild(text);
+  });
+}
+
+/* =========================================================================
+   MODULE 3 — MST: KRUSKAL / PRIM  (ported from daa3.py)
+   ========================================================================= */
+const MST_N = 7;
+const MST_EDGES = [
+  [7, 0, 1], [5, 0, 3], [8, 1, 2], [9, 1, 3],
+  [7, 1, 4], [5, 2, 4], [15, 3, 4], [6, 3, 5],
+  [8, 4, 5], [9, 4, 6], [11, 5, 6]
+];
+const MST_ADJ = (()=>{
+  const adj = {};
+  MST_EDGES.forEach(([w,u,v])=>{
+    (adj[u] = adj[u] || []).push([v,w]);
+    (adj[v] = adj[v] || []).push([u,w]);
+  });
+  return adj;
+})();
+const MST_POSITIONS = circleLayout(MST_N, 320, 200, 150);
+
+function kruskalSteps(n, edgesInput){
+  const edges = edgesInput.slice().sort((a,b)=> a[0]-b[0] || a[1]-b[1] || a[2]-b[2]);
+  const parent = Array.from({length:n}, (_,i)=>i);
+  const rank = new Array(n).fill(0);
+  function find(x){ if (parent[x] !== x) parent[x] = find(parent[x]); return parent[x]; }
+  const steps = [];
+  const mst = [];
+  let cost = 0;
+  for (const [w,u,v] of edges){
+    const rx = find(u), ry = find(v);
+    if (rx === ry){
+      steps.push({code:'reject', edge:[u,v,w], edgeState:'rejected', mst:mst.slice(), cost,
+        message:`Edge (${u}–${v}, weight ${w}) would connect two vertices already in the same component — rejected to avoid a cycle.`});
+    } else {
+      let a=rx, b=ry;
+      if (rank[a] < rank[b]) { const t=a; a=b; b=t; }
+      parent[b] = a;
+      if (rank[a] === rank[b]) rank[a]++;
+      mst.push([u,v,w]);
+      cost += w;
+      steps.push({code:'accept', edge:[u,v,w], edgeState:'accepted', mst:mst.slice(), cost,
+        message:`Edge (${u}–${v}, weight ${w}) links two separate components — added to the MST. Running cost: ${cost}.`});
+      if (mst.length === n - 1){
+        steps.push({code:'done', mst:mst.slice(), cost,
+          message:`MST complete: ${n-1} edges connect all ${n} vertices. Total cost: ${cost}.`});
+        break;
+      }
+    }
+  }
+  return steps;
+}
+
+function primSteps(n, adj, start){
+  const INF = Infinity;
+  const key = new Array(n).fill(INF);
+  const parent = new Array(n).fill(-1);
+  const inMST = new Array(n).fill(false);
+  key[start] = 0;
+  let pq = [[0, start]];
+  const steps = [];
+  const mst = [];
+  let cost = 0;
+  while (pq.length){
+    pq.sort((a,b)=> a[0]-b[0]);
+    const [w,u] = pq.shift();
+    if (inMST[u]){
+      steps.push({code:'skip', node:u, mst:mst.slice(), cost,
+        message:`Vertex ${u} is already in the MST — skip this stale priority-queue entry (weight ${w}).`});
+      continue;
+    }
+    inMST[u] = true;
+    if (parent[u] !== -1){
+      mst.push([parent[u], u, w]);
+      cost += w;
+      steps.push({code:'accept', edge:[parent[u], u, w], node:u, mst:mst.slice(), cost,
+        message:`Vertex ${u} joins the tree via edge (${parent[u]}–${u}, weight ${w}). Running cost: ${cost}.`});
+    } else {
+      steps.push({code:'start', node:u, mst:mst.slice(), cost,
+        message:`Start vertex ${u} added to the MST with no incoming edge.`});
+    }
+    for (const [v,wt] of (adj[u] || [])){
+      if (!inMST[v] && wt < key[v]){
+        key[v] = wt; parent[v] = u;
+        pq.push([wt, v]);
+        steps.push({code:'relax', node:v, via:u, weight:wt, mst:mst.slice(), cost,
+          message:`Relax vertex ${v}: reachable from ${u} at weight ${wt}, cheaper than its previous key — push to the priority queue.`});
+      }
+    }
+  }
+  steps.push({code:'done', mst:mst.slice(), cost, message:`MST complete. Total cost: ${cost}.`});
+  return steps;
+}
+
+const MST_CODE = {
+  kruskal: [
+    {id:'header', text:'edges.sort()   # by weight'},
+    {id:'reject', text:'for w, u, v in edges:'},
+    {id:'reject', text:'    if find(u) == find(v): continue  # cycle'},
+    {id:'accept', text:'    else: union(u, v); mst.append((u,v,w))'},
+    {id:'done', text:'    if len(mst) == n - 1: break'},
+  ],
+  prim: [
+    {id:'header', text:'key[start] = 0;  pq = [(0, start)]'},
+    {id:'skip', text:'while pq: w, u = heappop(pq)'},
+    {id:'skip', text:'    if inMST[u]: continue'},
+    {id:'accept', text:'    inMST[u] = True; mst.append((parent[u], u, w))'},
+    {id:'relax', text:'    for v, wt in adj[u]:'},
+    {id:'relax', text:'        if not inMST[v] and wt < key[v]: update & push'},
+  ]
+};
+const MST_COMPLEXITY = {
+  kruskal: [{cls:'b-cyan', text:'O(E log E)'}, {cls:'b-violet', text:'union-find ~O(α(n))'}, {cls:'b-green', text:'space O(V+E)'}],
+  prim: [{cls:'b-cyan', text:'O(E log V)'}, {cls:'b-violet', text:'binary heap'}, {cls:'b-green', text:'space O(V)'}]
+};
+
+let mstAlgo = 'kruskal';
+let mstSteps = [];
+let mstIdx = -1;
+let mstPlaying = false;
+let mstTimer = null;
+
+function setMstAlgo(algo){
+  mstAlgo = algo;
+  document.getElementById('tab-kruskal').classList.toggle('active', algo==='kruskal');
+  document.getElementById('tab-prim').classList.toggle('active', algo==='prim');
+  resetMst();
+}
+function initMstModule(){ resetMst(); }
+function resetMst(){
+  pauseMst();
+  mstSteps = mstAlgo === 'kruskal' ? kruskalSteps(MST_N, MST_EDGES) : primSteps(MST_N, MST_ADJ, 0);
+  mstIdx = -1;
+  renderCodePanel('mstCode', MST_CODE[mstAlgo], null);
+  renderComplexity('mstComplexity', MST_COMPLEXITY[mstAlgo]);
+  renderMstStep();
+}
+
+function renderMstStep(){
+  const total = mstSteps.length;
+  const step = mstIdx >= 0 ? mstSteps[mstIdx] : null;
+  document.getElementById('mstStepCounter').textContent = `Step ${mstIdx+1} / ${total}`;
+  document.getElementById('mBtnBack').disabled = mstIdx <= 0;
+  document.getElementById('mBtnFwd').disabled = mstIdx >= total-1;
+  document.getElementById('mstCaption').textContent = step ? step.message : 'Press play or step forward to begin.';
+
+  const mst = step ? step.mst : [];
+  let considered = 0;
+  for (let k=0; k<=mstIdx; k++){ const s = mstSteps[k]; if (s && (s.code==='accept' || s.code==='reject')) considered++; }
+  document.getElementById('mstStatConsidered').textContent = considered;
+  document.getElementById('mstStatEdges').textContent = mst.length;
+  document.getElementById('mstStatCost').textContent = step ? step.cost : 0;
+
+  renderCodePanel('mstCode', MST_CODE[mstAlgo], step ? step.code : null);
+
+  // build edge states for SVG
+  const mstKeySet = new Set(mst.map(([u,v])=> [u,v].sort((a,b)=>a-b).join('-')));
+  const edgeList = MST_EDGES.map(([w,u,v])=>{
+    const key = [u,v].sort((a,b)=>a-b).join('-');
+    let state = 'idle';
+    if (mstKeySet.has(key)) state = 'accepted';
+    if (step && step.edge){
+      const [su,sv] = step.edge;
+      const sKey = [su,sv].sort((a,b)=>a-b).join('-');
+      if (sKey === key) state = step.code==='reject' ? 'rejected' : 'considering';
+    }
+    return {u, v, w, state};
+  });
+  const nodeStates = MST_POSITIONS.map((_,i)=>{
+    const inTree = mst.some(([u,v])=> u===i || v===i) || (mstAlgo==='prim' && step && step.code==='start' && step.node===i);
+    let state = inTree ? 'settled' : 'idle';
+    if (step && (step.node===i) && (step.code==='relax' || step.code==='start')) state = 'active';
+    return {state};
+  });
+  renderGraphSVG('mstSvg', MST_POSITIONS, edgeList, nodeStates, {directed:false});
+
+  const tbl = document.getElementById('mstEdgeTable');
+  tbl.innerHTML = '<tr><th>Edge</th><th>Weight</th></tr>' +
+    (mst.length ? mst.map(([u,v,w])=>`<tr><td>${u} – ${v}</td><td>${w}</td></tr>`).join('') : '<tr><td colspan="2" style="color:var(--text-dim);">none yet</td></tr>');
+
+  document.getElementById('mstInference').innerHTML = mstAlgo === 'kruskal'
+    ? `Kruskal's algorithm looks at the whole edge list at once, sorted by weight, and uses union-find to reject any edge that would close a cycle. It's a natural fit when the edge list is already available and not too dense.`
+    : `Prim's algorithm never looks at edges outside the frontier of the growing tree — it only ever asks "what's the cheapest way to extend what I already have?" This makes it efficient on dense graphs represented as adjacency lists.`;
+}
+
+function stepMst(dir){
+  const next = mstIdx + dir;
+  if (next < -1 || next >= mstSteps.length) return;
+  mstIdx = Math.max(0, next);
+  if (dir < 0 && next < 0) mstIdx = -1;
+  renderMstStep();
+  if (mstIdx >= mstSteps.length - 1) pauseMst();
+}
+function togglePlayMst(){
+  if (mstPlaying){ pauseMst(); return; }
+  if (mstIdx >= mstSteps.length - 1) mstIdx = -1;
+  mstPlaying = true;
+  document.getElementById('mBtnPlay').textContent = '❚❚';
+  const tick = ()=>{
+    if (!mstPlaying) return;
+    if (mstIdx >= mstSteps.length - 1){ pauseMst(); return; }
+    mstIdx++;
+    renderMstStep();
+    const speed = parseInt(document.getElementById('mstSpeed').value, 10);
+    mstTimer = setTimeout(tick, speed);
+  };
+  const speed = parseInt(document.getElementById('mstSpeed').value, 10);
+  mstTimer = setTimeout(tick, speed);
+}
+function pauseMst(){ mstPlaying = false; clearTimeout(mstTimer); document.getElementById('mBtnPlay').textContent = '▶'; }
+
+/* =========================================================================
+   MODULE 4 — DIJKSTRA'S ALGORITHM  (ported from daa4.py)
+   ========================================================================= */
+const DIJ_GRAPH = {
+  0: [[1,4],[2,1]],
+  1: [[3,1]],
+  2: [[1,2],[3,5]],
+  3: [[4,3]],
+  4: [[5,2]],
+  5: []
+};
+const DIJ_N = 6;
+const DIJ_SOURCE = 0;
+const DIJ_POSITIONS = circleLayout(DIJ_N, 320, 190, 140);
+
+function dijkstraSteps(graph, source){
+  const n = Object.keys(graph).length;
+  const dist = new Array(n).fill(Infinity);
+  const prev = new Array(n).fill(null);
+  dist[source] = 0;
+  let pq = [[0, source]];
+  const visited = new Set();
+  const steps = [];
+  while (pq.length){
+    pq.sort((a,b)=> a[0]-b[0]);
+    const [d,u] = pq.shift();
+    if (visited.has(u)){
+      steps.push({code:'skip', node:u, dist:dist.slice(), prev:prev.slice(), visited:new Set(visited),
+        message:`Vertex ${u} is already finalized — skip this stale priority-queue entry.`});
+      continue;
+    }
+    visited.add(u);
+    steps.push({code:'visit', node:u, dist:dist.slice(), prev:prev.slice(), visited:new Set(visited),
+      message:`Pop the closest unfinished vertex: ${u}, with finalized distance ${dist[u]}.`});
+    for (const [v,w] of graph[u]){
+      if (dist[u] + w < dist[v]){
+        dist[v] = dist[u] + w;
+        prev[v] = u;
+        pq.push([dist[v], v]);
+        steps.push({code:'relax', node:v, via:u, weight:w, dist:dist.slice(), prev:prev.slice(), visited:new Set(visited),
+          message:`Relax edge (${u}→${v}, weight ${w}): a shorter path to ${v} was just found — new distance ${dist[v]}.`});
+      }
+    }
+  }
+  steps.push({code:'done', dist:dist.slice(), prev:prev.slice(), visited:new Set(visited),
+    message:`Dijkstra complete — every reachable vertex has its shortest distance from ${source} finalized.`});
+  return {steps, prev};
+}
+
+function reconstructPath(prev, source, target){
+  const path = [];
+  let node = target;
+  while (node !== null && node !== undefined){
+    path.push(node);
+    node = prev[node];
+  }
+  path.reverse();
+  if (path[0] === source) return path;
+  return [];
+}
+
+const DIJ_CODE = [
+  {id:'header', text:'dist[source] = 0;  pq = [(0, source)]'},
+  {id:'skip', text:'while pq: d, u = heappop(pq)'},
+  {id:'skip', text:'    if u in visited: continue'},
+  {id:'visit', text:'    visited.add(u)'},
+  {id:'relax', text:'    for v, w in graph[u]:'},
+  {id:'relax', text:'        if dist[u]+w < dist[v]: update & push'},
+];
+const DIJ_COMPLEXITY = [{cls:'b-cyan', text:'O((V+E) log V)'}, {cls:'b-violet', text:'binary heap'}, {cls:'b-green', text:'space O(V)'}];
+
+let dijkstraStepsData = [];
+let dijkstraIdx = -1;
+let dijkstraPlaying = false;
+let dijkstraTimer = null;
+
+function initDijkstraModule(){ resetDijkstra(); }
+function resetDijkstra(){
+  pauseDijkstra();
+  const r = dijkstraSteps(DIJ_GRAPH, DIJ_SOURCE);
+  dijkstraStepsData = r.steps;
+  dijkstraIdx = -1;
+  renderCodePanel('dijkstraCode', DIJ_CODE, null);
+  renderComplexity('dijkstraComplexity', DIJ_COMPLEXITY);
+  renderDijkstraStep();
+}
+
+function renderDijkstraStep(){
+  const total = dijkstraStepsData.length;
+  const step = dijkstraIdx >= 0 ? dijkstraStepsData[dijkstraIdx] : null;
+  document.getElementById('dijkstraStepCounter').textContent = `Step ${dijkstraIdx+1} / ${total}`;
+  document.getElementById('dBtnBack').disabled = dijkstraIdx <= 0;
+  document.getElementById('dBtnFwd').disabled = dijkstraIdx >= total-1;
+  document.getElementById('dijkstraCaption').textContent = step ? step.message : 'Press play or step forward to begin.';
+
+  const visited = step ? step.visited : new Set();
+  let relaxCount = 0;
+  for (let k=0; k<=dijkstraIdx; k++){ const s = dijkstraStepsData[k]; if (s && s.code==='relax') relaxCount++; }
+  document.getElementById('dijkstraStatVisited').textContent = visited.size;
+  document.getElementById('dijkstraStatRelax').textContent = relaxCount;
+
+  renderCodePanel('dijkstraCode', DIJ_CODE, step ? step.code : null);
+
+  const prev = step ? step.prev : new Array(DIJ_N).fill(null);
+  const treeEdges = new Set();
+  prev.forEach((p,v)=>{ if (p !== null && p !== undefined) treeEdges.add(p+'-'+v); });
+
+  const edgeList = [];
+  for (const u in DIJ_GRAPH){
+    DIJ_GRAPH[u].forEach(([v,w])=>{
+      const key = u+'-'+v;
+      let state = 'idle';
+      if (treeEdges.has(key)) state = 'tree';
+      if (step && step.code==='relax' && step.via==parseInt(u) && step.node===v) state = 'considering';
+      edgeList.push({u:parseInt(u), v, w, state});
+    });
+  }
+  const nodeStates = DIJ_POSITIONS.map((_,i)=>{
+    let state = visited.has(i) ? 'settled' : 'idle';
+    if (step && step.node===i && (step.code==='visit' || step.code==='relax')) state = state==='settled' ? 'settled' : 'active';
+    return {state};
+  });
+  renderGraphSVG('dijkstraSvg', DIJ_POSITIONS, edgeList, nodeStates, {directed:true});
+
+  const dist = step ? step.dist : new Array(DIJ_N).fill(Infinity);
+  const tbl = document.getElementById('dijkstraDistTable');
+  tbl.innerHTML = '<tr><th>Vertex</th><th>Distance</th><th>Path from 0</th></tr>' +
+    Array.from({length:DIJ_N}, (_,v)=>{
+      const d = dist[v] === Infinity ? '∞' : dist[v];
+      const path = step ? reconstructPath(prev, DIJ_SOURCE, v) : [];
+      const pathStr = path.length ? path.join(' → ') : (v===DIJ_SOURCE ? '0' : '—');
+      return `<tr><td>${v}</td><td>${d}</td><td>${pathStr}</td></tr>`;
+    }).join('');
+
+  document.getElementById('dijkstraInference').innerHTML =
+    `Because the heap always pops the currently-closest unfinished vertex, once a vertex is popped its distance can never improve again — that's what lets Dijkstra finalize vertices one at a time instead of revisiting them. This only holds because every edge weight here is non-negative.`;
+}
+
+function stepDijkstra(dir){
+  const next = dijkstraIdx + dir;
+  if (next < -1 || next >= dijkstraStepsData.length) return;
+  dijkstraIdx = Math.max(0, next);
+  if (dir < 0 && next < 0) dijkstraIdx = -1;
+  renderDijkstraStep();
+  if (dijkstraIdx >= dijkstraStepsData.length - 1) pauseDijkstra();
+}
+function togglePlayDijkstra(){
+  if (dijkstraPlaying){ pauseDijkstra(); return; }
+  if (dijkstraIdx >= dijkstraStepsData.length - 1) dijkstraIdx = -1;
+  dijkstraPlaying = true;
+  document.getElementById('dBtnPlay').textContent = '❚❚';
+  const tick = ()=>{
+    if (!dijkstraPlaying) return;
+    if (dijkstraIdx >= dijkstraStepsData.length - 1){ pauseDijkstra(); return; }
+    dijkstraIdx++;
+    renderDijkstraStep();
+    const speed = parseInt(document.getElementById('dijkstraSpeed').value, 10);
+    dijkstraTimer = setTimeout(tick, speed);
+  };
+  const speed = parseInt(document.getElementById('dijkstraSpeed').value, 10);
+  dijkstraTimer = setTimeout(tick, speed);
+}
+function pauseDijkstra(){ dijkstraPlaying = false; clearTimeout(dijkstraTimer); document.getElementById('dBtnPlay').textContent = '▶'; }
+
+/* =========================================================================
+   COMPARISON VIEW
+   ========================================================================= */
+function initCompareView(){
+  const interp = interpolationSteps(SEARCH_ARR, SEARCH_TARGET);
+  const bin = binarySteps(SEARCH_ARR, SEARCH_TARGET);
+  const interpC = interp[interp.length-1].comparisons;
+  const binC = bin[bin.length-1].comparisons;
+  const maxSearch = Math.max(interpC, binC, 1);
+
+  const searchRows = [
+    {name:'Interpolation Search', c:interpC},
+    {name:'Binary Search', c:binC},
+  ];
+  document.getElementById('compareSearchTable').innerHTML =
+    '<tr><th>Algorithm</th><th>Comparisons</th><th style="width:45%;">Relative cost</th></tr>' +
+    searchRows.map(r=>`<tr><td>${r.name}</td><td>${r.c}</td><td><div class="bar-wrap"><div class="bar-track"><div class="bar-fill" style="width:${(r.c/maxSearch*100).toFixed(0)}%;"></div></div></div></td></tr>`).join('');
+
+  const naiveC = naiveSteps(STR_TEXT, STR_PATTERN).slice(-1)[0].comparisons;
+  const kmpC = kmpSteps(STR_TEXT, STR_PATTERN).steps.slice(-1)[0].comparisons;
+  const rkC = rabinKarpSteps(STR_TEXT, STR_PATTERN).slice(-1)[0].comparisons;
+  const maxStr = Math.max(naiveC, kmpC, rkC, 1);
+  const stringRows = [
+    {name:'Naive Search', c:naiveC},
+    {name:'KMP', c:kmpC},
+    {name:'Rabin–Karp', c:rkC},
+  ];
+  document.getElementById('compareStringTable').innerHTML =
+    '<tr><th>Algorithm</th><th>Comparisons</th><th style="width:45%;">Relative cost</th></tr>' +
+    stringRows.map(r=>`<tr><td>${r.name}</td><td>${r.c}</td><td><div class="bar-wrap"><div class="bar-track"><div class="bar-fill" style="width:${(r.c/maxStr*100).toFixed(0)}%;"></div></div></div></td></tr>`).join('');
+
+  const kSteps = kruskalSteps(MST_N, MST_EDGES);
+  const pSteps = primSteps(MST_N, MST_ADJ, 0);
+  const kFinal = kSteps[kSteps.length-1];
+  const pFinal = pSteps[pSteps.length-1];
+  const kOps = kSteps.filter(s=>s.code==='accept'||s.code==='reject').length;
+  const pOps = pSteps.filter(s=>s.code==='accept'||s.code==='relax'||s.code==='skip'||s.code==='start').length;
+  const maxMst = Math.max(kOps, pOps, 1);
+  const mstRows = [
+    {name:`Kruskal (cost ${kFinal.cost})`, c:kOps},
+    {name:`Prim (cost ${pFinal.cost})`, c:pOps},
+  ];
+  document.getElementById('compareMstTable').innerHTML =
+    '<tr><th>Algorithm</th><th>Steps (edge checks / relaxations)</th><th style="width:40%;">Relative cost</th></tr>' +
+    mstRows.map(r=>`<tr><td>${r.name}</td><td>${r.c}</td><td><div class="bar-wrap"><div class="bar-track"><div class="bar-fill" style="width:${(r.c/maxMst*100).toFixed(0)}%;"></div></div></div></td></tr>`).join('');
+
+  const dResult = dijkstraSteps(DIJ_GRAPH, DIJ_SOURCE);
+  const dRelax = dResult.steps.filter(s=>s.code==='relax').length;
+  const dVisit = dResult.steps.filter(s=>s.code==='visit').length;
+  document.getElementById('compareDijkstraTable').innerHTML =
+    '<tr><th>Metric</th><th>Count</th></tr>' +
+    `<tr><td>Vertices finalized</td><td>${dVisit}</td></tr>` +
+    `<tr><td>Edge relaxations</td><td>${dRelax}</td></tr>` +
+    `<tr><td>Total heap operations</td><td>${dResult.steps.length}</td></tr>`;
+}
+
+/* init on load */
+initSearchModule();
+</script>
+</body>
+</html>

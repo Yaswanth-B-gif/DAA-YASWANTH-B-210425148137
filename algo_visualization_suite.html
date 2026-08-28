@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Algorithm Holographic Visualization Suite</title>
+<style>
+  :root{
+    --bg:#04060c;
+    --bg2:#080d1c;
+    --panel:#0b1226;
+    --panel-2:#0e1730;
+    --border: rgba(0,229,255,0.22);
+    --border-strong: rgba(0,229,255,0.55);
+    --cyan:#00e5ff;
+    --violet:#b06bff;
+    --amber:#ffb300;
+    --green:#28ffb0;
+    --red:#ff4d6d;
+    --text:#dff4ff;
+    --muted:#6f84a6;
+    --mono: 'SFMono-Regular', 'JetBrains Mono', 'Fira Code', Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--sans);height:100%;overflow-x:hidden;}
+  @media (prefers-reduced-motion: reduce){ *{animation-duration:0.01ms !important; transition-duration:0.01ms !important;} }
+
+  #grid-bg{
+    position:fixed; inset:0; z-index:0; pointer-events:none;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.055) 1px, transparent 1px);
+    background-size:38px 38px;
+    mask-image: radial-gradient(ellipse at 50% 20%, black 10%, transparent 75%);
+  }
+  #scan{
+    position:fixed; left:0; right:0; height:120px; z-index:1; pointer-events:none;
+    background:linear-gradient(180deg, transparent, rgba(0,229,255,0.06), transparent);
+    animation:scanmove 7s linear infinite;
+  }
+  @keyframes scanmove{ 0%{top:-120px;} 100%{top:100%;} }
+
+  #app{position:relative; z-index:2; max-width:1180px; margin:0 auto; padding:28px 22px 80px;}
+
+  header#topbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:26px; flex-wrap:wrap; gap:10px;}
+  .brand{font-family:var(--mono); letter-spacing:2px; font-size:13px; color:var(--cyan); text-transform:uppercase;}
+  .brand span{color:var(--violet);}
+  nav.crumbs{font-family:var(--mono); font-size:12px; color:var(--muted); display:flex; gap:8px; align-items:center;}
+  nav.crumbs button{background:none; border:1px solid var(--border); color:var(--cyan); font-family:var(--mono); font-size:11px; padding:5px 10px; border-radius:3px; cursor:pointer; letter-spacing:1px;}
+  nav.crumbs button:hover{border-color:var(--border-strong); box-shadow:0 0 12px rgba(0,229,255,0.25);}
+
+  .view{display:none;}
+  .view.active{display:block; animation:materialize .5s ease;}
+  @keyframes materialize{ from{opacity:0; transform:translateY(10px) scale(0.99);} to{opacity:1; transform:none;} }
+
+  /* HUB */
+  #hub h1{font-family:var(--mono); font-size:clamp(22px,4vw,34px); letter-spacing:1px; margin:0 0 6px; text-shadow:0 0 18px rgba(0,229,255,0.35);}
+  #hub .sub{color:var(--muted); font-size:14px; margin-bottom:30px; max-width:640px; line-height:1.6;}
+  .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:18px;}
+  .card{
+    background:linear-gradient(180deg, var(--panel), var(--bg2));
+    border:1px solid var(--border); border-radius:8px; padding:20px;
+    cursor:pointer; position:relative; overflow:hidden; transition:.25s;
+  }
+  .card::before{content:""; position:absolute; inset:0; border-radius:8px; padding:1px;
+    background:linear-gradient(135deg, rgba(0,229,255,0.5), rgba(176,107,255,0.15), transparent 60%);
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude; opacity:0; transition:.25s;}
+  .card:hover{transform:translateY(-3px); box-shadow:0 10px 30px rgba(0,229,255,0.12);}
+  .card:hover::before{opacity:1;}
+  .card .tag{font-family:var(--mono); font-size:10px; color:var(--violet); letter-spacing:2px;}
+  .card h3{margin:8px 0 8px; font-size:19px; font-family:var(--mono);}
+  .card p{color:var(--muted); font-size:13px; line-height:1.55; margin:0 0 16px;}
+  .badges{display:flex; gap:8px; flex-wrap:wrap;}
+  .badge{font-family:var(--mono); font-size:11px; padding:3px 9px; border:1px solid var(--border); border-radius:20px; color:var(--cyan);}
+  .badge.alt{color:var(--amber); border-color:rgba(255,179,0,0.35);}
+  .card .go{position:absolute; right:16px; bottom:16px; font-family:var(--mono); font-size:11px; color:var(--muted);}
+
+  .compare-card{margin-top:18px; border-style:dashed;}
+
+  /* MODULE LAYOUT */
+  .module-head{display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap; margin-bottom:16px;}
+  .module-head h2{font-family:var(--mono); font-size:24px; margin:0 0 6px;}
+  .aim{color:var(--muted); font-size:13.5px; max-width:640px; line-height:1.6;}
+  .complexity-row{display:flex; gap:8px; flex-wrap:wrap;}
+
+  .grid2{display:grid; grid-template-columns:1.4fr 1fr; gap:16px;}
+  @media (max-width:880px){ .grid2{grid-template-columns:1fr;} }
+
+  .panel{background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:16px;}
+  .panel h4{font-family:var(--mono); font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--cyan); margin:0 0 12px;}
+
+  /* CONTROLS */
+  .controls{display:flex; align-items:center; gap:8px; margin:16px 0; flex-wrap:wrap;}
+  .ctrl-btn{background:var(--panel-2); border:1px solid var(--border); color:var(--text); font-family:var(--mono); font-size:13px; padding:8px 14px; border-radius:4px; cursor:pointer; transition:.2s;}
+  .ctrl-btn:hover{border-color:var(--border-strong); box-shadow:0 0 10px rgba(0,229,255,0.2); color:var(--cyan);}
+  .ctrl-btn:disabled{opacity:.35; cursor:not-allowed;}
+  .ctrl-btn.play{color:var(--green); border-color:rgba(40,255,176,0.4);}
+  .step-counter{font-family:var(--mono); font-size:12px; color:var(--muted); margin-left:auto;}
+  .speed{display:flex; align-items:center; gap:6px; font-family:var(--mono); font-size:11px; color:var(--muted);}
+
+  /* ARRAY BARS */
+  .bars{display:flex; align-items:flex-end; gap:6px; height:170px; padding:10px 4px 26px; position:relative;}
+  .bar-wrap{display:flex; flex-direction:column; align-items:center; flex:1; position:relative; height:100%; justify-content:flex-end;}
+  .bar{width:100%; max-width:42px; background:linear-gradient(180deg, rgba(0,229,255,0.85), rgba(0,229,255,0.25)); border-radius:3px 3px 0 0; transition:.35s; box-shadow:0 0 0 rgba(0,229,255,0);}
+  .bar.inrange{background:linear-gradient(180deg, rgba(176,107,255,0.9), rgba(176,107,255,0.3));}
+  .bar.compare{background:linear-gradient(180deg, #fff, var(--amber)); box-shadow:0 0 16px rgba(255,179,0,0.7);}
+  .bar.result{background:linear-gradient(180deg, #fff, var(--green)); box-shadow:0 0 16px rgba(40,255,176,0.6);}
+  .bar-val{font-family:var(--mono); font-size:10px; color:var(--muted); position:absolute; bottom:-18px;}
+  .bar-idx{font-family:var(--mono); font-size:9px; color:#3a4a63; position:absolute; bottom:-30px;}
+  .pointer{position:absolute; top:-20px; font-family:var(--mono); font-size:10px; padding:1px 5px; border-radius:3px; white-space:nowrap;}
+  .pointer.low{color:var(--cyan); border:1px solid var(--cyan);}
+  .pointer.high{color:var(--violet); border:1px solid var(--violet);}
+  .pointer.mid{color:var(--amber); border:1px solid var(--amber);}
+
+  /* TRACE LOG */
+  .trace-log{font-family:var(--mono); font-size:12px; line-height:1.75; max-height:260px; overflow-y:auto; padding-right:4px;}
+  .trace-log .line{color:#3d4f6c; padding-left:calc(var(--d,0) * 14px); white-space:pre-wrap;}
+  .trace-log .line.active{color:var(--cyan); text-shadow:0 0 8px rgba(0,229,255,0.5);}
+  .trace-log .line.done{color:#5f7392;}
+
+  .caption{font-family:var(--sans); font-size:13.5px; color:var(--text); background:var(--panel-2); border-left:2px solid var(--cyan); padding:10px 14px; border-radius:0 5px 5px 0; margin-top:14px; min-height:20px; line-height:1.5;}
+
+  /* CODE PANEL */
+  pre.code{font-family:var(--mono); font-size:12.5px; line-height:1.9; margin:0; overflow-x:auto;}
+  pre.code .l{display:block; padding:1px 8px; border-left:2px solid transparent; color:#7f93b3; border-radius:2px;}
+  pre.code .l.active{color:#fff; background:rgba(0,229,255,0.1); border-left-color:var(--cyan);}
+  .kw{color:var(--violet);} .fn{color:var(--cyan);} .num{color:var(--amber);}
+
+  .stat-row{display:flex; gap:18px; margin-top:14px; flex-wrap:wrap;}
+  .stat{font-family:var(--mono); font-size:12px; color:var(--muted);}
+  .stat b{color:var(--green); font-size:15px; display:block;}
+
+  /* MCM TABLE */
+  .mcm-wrap{overflow-x:auto;}
+  table.mcm{border-collapse:collapse; font-family:var(--mono); font-size:12px;}
+  table.mcm th, table.mcm td{width:56px; height:44px; text-align:center; border:1px solid var(--border); color:var(--muted); position:relative;}
+  table.mcm th{color:var(--cyan); font-weight:normal;}
+  table.mcm td.cell{color:var(--text); transition:.3s;}
+  table.mcm td.cell.dash{color:#26314a;}
+  table.mcm td.cell.active{background:rgba(255,179,0,0.15); box-shadow:inset 0 0 0 1px var(--amber);}
+  table.mcm td.cell.filled{background:rgba(40,255,176,0.08); box-shadow:inset 0 0 0 1px rgba(40,255,176,0.4); color:var(--green);}
+  .k-note{font-size:9px; position:absolute; bottom:2px; right:3px; color:var(--muted);}
+
+  .formula{font-family:var(--mono); font-size:12.5px; background:var(--panel-2); border:1px solid var(--border); border-radius:5px; padding:10px 12px; margin-top:10px; color:var(--text); line-height:1.7;}
+  .formula .hl{color:var(--amber);}
+  .formula .win{color:var(--green);}
+
+  .paren-box{font-family:var(--mono); font-size:15px; text-align:center; padding:16px; color:var(--green); text-shadow:0 0 12px rgba(40,255,176,0.5); min-height:24px;}
+
+  details.collapse{margin-top:16px; border-top:1px dashed var(--border); padding-top:10px;}
+  details.collapse summary{cursor:pointer; font-family:var(--mono); font-size:11px; letter-spacing:1px; color:var(--muted); text-transform:uppercase;}
+  details.collapse .body{font-size:13px; color:var(--muted); line-height:1.6; margin-top:8px;}
+
+  /* COMPARE VIEW */
+  .chart-wrap{background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:20px;}
+  .legend{display:flex; gap:20px; font-family:var(--mono); font-size:12px; margin-top:10px;}
+  .legend .dot{display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px;}
+
+  ::-webkit-scrollbar{width:8px; height:8px;}
+  ::-webkit-scrollbar-thumb{background:rgba(0,229,255,0.25); border-radius:4px;}
+
+  /* N-QUEENS BOARD */
+  .nq-controls-extra{display:flex; gap:6px; align-items:center; font-family:var(--mono); font-size:11px; color:var(--muted); margin-left:6px;}
+  .nq-controls-extra button{background:var(--panel-2); border:1px solid var(--border); color:var(--text); font-family:var(--mono); font-size:11px; padding:5px 9px; border-radius:4px; cursor:pointer;}
+  .nq-controls-extra button.active{color:var(--cyan); border-color:var(--border-strong); box-shadow:0 0 8px rgba(0,229,255,0.25);}
+  .nq-board{display:grid; gap:3px; margin:0 auto; max-width:320px;}
+  .nq-cell{aspect-ratio:1; background:var(--panel-2); border:1px solid var(--border); border-radius:3px; display:flex; align-items:center; justify-content:center; font-size:clamp(14px,3vw,22px); position:relative; transition:.25s;}
+  .nq-cell.trying{box-shadow:inset 0 0 0 2px var(--amber); background:rgba(255,179,0,0.1);}
+  .nq-cell.reject{box-shadow:inset 0 0 0 2px var(--red); background:rgba(255,77,109,0.12);}
+  .nq-cell.rowactive{background:rgba(0,229,255,0.06);}
+  .nq-queen{color:var(--green); text-shadow:0 0 10px rgba(40,255,176,0.7); animation:qpop .25s ease;}
+  @keyframes qpop{ from{transform:scale(0.3); opacity:0;} to{transform:scale(1); opacity:1;} }
+  .nq-solved-badge{display:inline-block; font-family:var(--mono); font-size:11px; color:var(--green); border:1px solid rgba(40,255,176,0.4); border-radius:20px; padding:3px 10px; margin-top:10px;}
+
+  /* TSP */
+  .tsp-map{width:100%; height:auto;}
+  .tsp-city{fill:var(--panel-2); stroke:var(--cyan); stroke-width:1.5;}
+  .tsp-city-label{font-family:var(--mono); font-size:12px; fill:var(--text);}
+  .tsp-edge{stroke:rgba(111,132,166,0.35); stroke-width:1.5; fill:none;}
+  .tsp-edge.current{stroke:var(--amber); stroke-width:2.5; filter:drop-shadow(0 0 5px rgba(255,179,0,0.6));}
+  .tsp-edge.best{stroke:var(--green); stroke-width:2.5; filter:drop-shadow(0 0 6px rgba(40,255,176,0.65));}
+  .perm-list{font-family:var(--mono); font-size:11.5px; max-height:150px; overflow-y:auto; line-height:1.8; margin-top:10px;}
+  .perm-list .p{color:#3d4f6c; display:flex; justify-content:space-between; padding:1px 4px;}
+  .perm-list .p.active{color:var(--amber);}
+  .perm-list .p.best{color:var(--green);}
+</style>
+</head>
+<body>
+<div id="grid-bg"></div>
+<div id="scan"></div>
+
+<div id="app">
+  <header id="topbar">
+    <div class="brand">DAA :: <span>Holographic Trace Console</span></div>
+    <nav class="crumbs">
+      <button onclick="goHub()">◂ Hub</button>
+      <span id="crumb-current">Overview</span>
+    </nav>
+  </header>
+
+  <!-- HUB -->
+  <section id="hub" class="view active">
+    <h1>Algorithm Visualization Suite</h1>
+    <p class="sub">Two experiments detected in source. Step through the real recursion / DP trace generated from the actual algorithm logic — not a canned animation.</p>
+    <div class="cards">
+      <div class="card" onclick="openModule('minmax')">
+        <div class="tag">EXPERIMENT 05 · ARRAY</div>
+        <h3>Min &amp; Max — Divide &amp; Conquer</h3>
+        <p>Recursively splits the array in half to find the minimum and maximum using only 3n/2 − 2 comparisons instead of the naive 2n − 2.</p>
+        <div class="badges">
+          <span class="badge">Θ(n) time</span>
+          <span class="badge alt">3n/2 − 2 comps</span>
+        </div>
+        <div class="go">open module →</div>
+      </div>
+      <div class="card" onclick="openModule('mcm')">
+        <div class="tag">EXPERIMENT 06 · MATRIX / DP</div>
+        <h3>Matrix Chain Multiplication</h3>
+        <p>Bottom-up dynamic programming finds the cheapest way to parenthesize a chain of matrix multiplications by filling a cost table.</p>
+        <div class="badges">
+          <span class="badge">O(n³) time</span>
+          <span class="badge alt">O(n²) space</span>
+        </div>
+        <div class="go">open module →</div>
+      </div>
+      <div class="card" onclick="openModule('nqueens')">
+        <div class="tag">EXPERIMENT 07 · BOARD</div>
+        <h3>N-Queens — Backtracking</h3>
+        <p>Places queens row by row, checking column and diagonal conflicts, and backtracks the instant a placement can't lead anywhere.</p>
+        <div class="badges">
+          <span class="badge alt">O(n!) worst case</span>
+          <span class="badge">Space: O(n)</span>
+        </div>
+        <div class="go">open module →</div>
+      </div>
+      <div class="card" onclick="openModule('tsp')">
+        <div class="tag">EXPERIMENT 08 · GRAPH</div>
+        <h3>Travelling Salesman — Exhaustive Search</h3>
+        <p>Tries every possible city ordering, tallies the round-trip cost for each, and keeps the cheapest tour found so far.</p>
+        <div class="badges">
+          <span class="badge alt">O((n-1)!) time</span>
+          <span class="badge">Space: O(n)</span>
+        </div>
+        <div class="go">open module →</div>
+      </div>
+    </div>
+    <div class="card compare-card" onclick="openModule('compare')">
+      <div class="tag">GLOBAL VIEW</div>
+      <h3>Complexity Comparison</h3>
+      <p>Plot all four algorithms' growth rates on a shared log scale to see how linear, cubic, and factorial behavior diverge as n grows.</p>
+      <div class="go">open view →</div>
+    </div>
+  </section>
+
+  <!-- MODULE: MIN-MAX -->
+  <section id="module-minmax" class="view">
+    <div class="module-head">
+      <div>
+        <h2>Min &amp; Max — Divide &amp; Conquer</h2>
+        <p class="aim">Aim: split the array at its midpoint, recursively find (min,max) of each half, then combine with exactly two comparisons — beating the naive two-per-element scan.</p>
+      </div>
+      <div class="complexity-row">
+        <span class="badge">Best/Avg/Worst: Θ(n)</span>
+        <span class="badge alt">Space: O(log n)</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="ctrl-btn" onclick="mm.reset()">⟲ Reset</button>
+      <button class="ctrl-btn" onclick="mm.stepBack()">◂ Step</button>
+      <button class="ctrl-btn play" id="mm-play" onclick="mm.togglePlay()">▶ Play</button>
+      <button class="ctrl-btn" onclick="mm.stepFwd()">Step ▸</button>
+      <span class="speed">Speed <input type="range" id="mm-speed" min="300" max="2200" value="1000" step="100"></span>
+      <span class="step-counter" id="mm-counter">Step 0 / 0</span>
+    </div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h4>Array State</h4>
+        <div class="bars" id="mm-bars"></div>
+        <div class="caption" id="mm-caption">Press Play or Step ▸ to begin.</div>
+        <div class="stat-row">
+          <div class="stat">Comparisons so far<b id="mm-comps">0</b></div>
+          <div class="stat">Current range<b id="mm-range">—</b></div>
+          <div class="stat">Recursion depth<b id="mm-depth">0</b></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h4>Pseudocode</h4>
+        <pre class="code" id="mm-code"></pre>
+        <h4 style="margin-top:18px;">Recursion Trace</h4>
+        <div class="trace-log" id="mm-trace"></div>
+      </div>
+    </div>
+
+    <details class="collapse">
+      <summary>Result &amp; Inference</summary>
+      <div class="body">On the sample array, the divide-and-conquer approach reaches the true minimum and maximum using noticeably fewer comparisons than the naive two-comparisons-per-element sweep, matching the 3n/2 − 2 bound. The gap widens as the array grows, which is why the technique matters more at scale than on tiny inputs.</div>
+    </details>
+  </section>
+
+  <!-- MODULE: MCM -->
+  <section id="module-mcm" class="view">
+    <div class="module-head">
+      <div>
+        <h2>Matrix Chain Multiplication</h2>
+        <p class="aim">Aim: fill a cost table m[i][j] bottom-up over increasing chain lengths, trying every split point k, and remember the best split in s[i][j] to reconstruct the optimal parenthesization.</p>
+      </div>
+      <div class="complexity-row">
+        <span class="badge">Time: O(n³)</span>
+        <span class="badge alt">Space: O(n²)</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="ctrl-btn" onclick="mc.reset()">⟲ Reset</button>
+      <button class="ctrl-btn" onclick="mc.stepBack()">◂ Step</button>
+      <button class="ctrl-btn play" id="mc-play" onclick="mc.togglePlay()">▶ Play</button>
+      <button class="ctrl-btn" onclick="mc.stepFwd()">Step ▸</button>
+      <span class="speed">Speed <input type="range" id="mc-speed" min="200" max="1800" value="700" step="100"></span>
+      <span class="step-counter" id="mc-counter">Step 0 / 0</span>
+    </div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h4>DP Cost Table m[i][j]</h4>
+        <div class="mcm-wrap"><table class="mcm" id="mc-table"></table></div>
+        <div class="formula" id="mc-formula">Waiting to start…</div>
+        <div class="caption" id="mc-caption">Press Play or Step ▸ to begin.</div>
+      </div>
+      <div class="panel">
+        <h4>Pseudocode</h4>
+        <pre class="code" id="mc-code"></pre>
+        <h4 style="margin-top:18px;">Optimal Parenthesization</h4>
+        <div class="paren-box" id="mc-paren">—</div>
+      </div>
+    </div>
+
+    <details class="collapse">
+      <summary>Result &amp; Inference</summary>
+      <div class="body">The chain A1(10×30) · A2(30×5) · A3(5×60) · A4(60×10) has several possible parenthesizations, and their scalar-multiplication costs differ by an order of magnitude. Dynamic programming avoids recomputing the cost of any sub-chain by storing it once it's solved, which is what keeps the whole table fill at O(n³) instead of exponential.</div>
+    </details>
+  </section>
+
+  <!-- MODULE: N-QUEENS -->
+  <section id="module-nqueens" class="view">
+    <div class="module-head">
+      <div>
+        <h2>N-Queens — Backtracking</h2>
+        <p class="aim">Aim: place one queen per row. Before placing in a column, check it doesn't share a column or diagonal with any queen already placed above. If no column works, backtrack and try the next option in the previous row.</p>
+      </div>
+      <div class="complexity-row">
+        <span class="badge alt">Worst case: O(n!)</span>
+        <span class="badge">Space: O(n)</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="ctrl-btn" onclick="nq.reset()">⟲ Reset</button>
+      <button class="ctrl-btn" onclick="nq.stepBack()">◂ Step</button>
+      <button class="ctrl-btn play" id="nq-play" onclick="nq.togglePlay()">▶ Play</button>
+      <button class="ctrl-btn" onclick="nq.stepFwd()">Step ▸</button>
+      <span class="speed">Speed <input type="range" id="nq-speed" min="150" max="1400" value="500" step="50"></span>
+      <div class="nq-controls-extra">
+        Board size:
+        <button id="nq-n-4" onclick="nq.setN(4)">4</button>
+        <button id="nq-n-5" onclick="nq.setN(5)">5</button>
+        <button id="nq-n-6" onclick="nq.setN(6)">6</button>
+      </div>
+      <span class="step-counter" id="nq-counter">Step 0 / 0</span>
+    </div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h4>Board State</h4>
+        <div class="nq-board" id="nq-board"></div>
+        <div class="caption" id="nq-caption">Press Play or Step ▸ to begin.</div>
+        <div class="stat-row">
+          <div class="stat">Backtracks so far<b id="nq-backtracks">0</b></div>
+          <div class="stat">Solutions found<b id="nq-solutions">0</b></div>
+          <div class="stat">Current row<b id="nq-row">0</b></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h4>Pseudocode</h4>
+        <pre class="code" id="nq-code"></pre>
+        <h4 style="margin-top:18px;">Backtrack Trace</h4>
+        <div class="trace-log" id="nq-trace"></div>
+      </div>
+    </div>
+
+    <details class="collapse">
+      <summary>Result &amp; Inference</summary>
+      <div class="body">Every extra row multiplies the number of column choices that have to be checked, so the search space grows factorially with board size. Backtracking keeps this workable by abandoning a row's placement the moment a conflict is detected, instead of building out full boards that were doomed from the first bad move — which is why the solve times for n=4, 6, and 8 diverge so quickly even though the rule being checked at each cell is identical.</div>
+    </details>
+  </section>
+
+  <!-- MODULE: TSP -->
+  <section id="module-tsp" class="view">
+    <div class="module-head">
+      <div>
+        <h2>Travelling Salesman — Exhaustive Search</h2>
+        <p class="aim">Aim: fix the tour's start city, generate every ordering of the remaining cities, total the round-trip cost of each, and keep the cheapest one found. (The source file also includes a matrix-reduction helper for branch-and-bound pruning, but the routine actually run here is the brute-force check against every permutation.)</p>
+      </div>
+      <div class="complexity-row">
+        <span class="badge alt">Time: O((n-1)!)</span>
+        <span class="badge">Space: O(n)</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="ctrl-btn" onclick="tsp.reset()">⟲ Reset</button>
+      <button class="ctrl-btn" onclick="tsp.stepBack()">◂ Step</button>
+      <button class="ctrl-btn play" id="tsp-play" onclick="tsp.togglePlay()">▶ Play</button>
+      <button class="ctrl-btn" onclick="tsp.stepFwd()">Step ▸</button>
+      <span class="speed">Speed <input type="range" id="tsp-speed" min="200" max="1800" value="700" step="100"></span>
+      <span class="step-counter" id="tsp-counter">Step 0 / 0</span>
+    </div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h4>City Map</h4>
+        <svg id="tsp-map" class="tsp-map" viewBox="0 0 360 300"></svg>
+        <div class="caption" id="tsp-caption">Press Play or Step ▸ to begin.</div>
+        <div class="stat-row">
+          <div class="stat">Permutation<b id="tsp-permidx">0 / 0</b></div>
+          <div class="stat">Current tour cost<b id="tsp-curcost">—</b></div>
+          <div class="stat">Best cost so far<b id="tsp-bestcost">∞</b></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h4>Pseudocode</h4>
+        <pre class="code" id="tsp-code"></pre>
+        <h4 style="margin-top:18px;">Permutations Tried</h4>
+        <div class="perm-list" id="tsp-permlist"></div>
+      </div>
+    </div>
+
+    <details class="collapse">
+      <summary>Result &amp; Inference</summary>
+      <div class="body">With 5 cities, fixing the start leaves 4! = 24 orderings to check, which is still small enough to brute-force in an instant. That factor grows so fast that a 15-city version of the same approach would already be computationally out of reach — which is the practical motivation for reduction-and-bound techniques that discard whole branches of unfinished tours instead of completing every one of them.</div>
+    </details>
+  </section>
+
+  <!-- COMPARE VIEW -->
+  <section id="module-compare" class="view">
+    <div class="module-head">
+      <div>
+        <h2>Complexity Comparison</h2>
+        <p class="aim">Θ(n), O(n³), and two factorial-order growth curves plotted on a shared log-scaled axis.</p>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <svg id="cmp-chart" viewBox="0 0 640 340" style="width:100%; height:auto;"></svg>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--cyan); box-shadow:0 0 6px var(--cyan);"></span>Min-Max D&amp;C — 3n/2 − 2</span>
+        <span><span class="dot" style="background:var(--violet); box-shadow:0 0 6px var(--violet);"></span>Matrix Chain — ~n³</span>
+        <span><span class="dot" style="background:var(--amber); box-shadow:0 0 6px var(--amber);"></span>N-Queens — ~n!</span>
+        <span><span class="dot" style="background:var(--red); box-shadow:0 0 6px var(--red);"></span>TSP — ~(n−1)!</span>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ---------- navigation ---------- */
+function goHub(){ showView('hub'); document.getElementById('crumb-current').textContent = 'Overview'; }
+function openModule(id){
+  showView('module-'+id);
+  const labels = {minmax:'Min & Max — Divide & Conquer', mcm:'Matrix Chain Multiplication', nqueens:'N-Queens — Backtracking', tsp:'Travelling Salesman — Exhaustive Search', compare:'Complexity Comparison'};
+  document.getElementById('crumb-current').textContent = labels[id];
+  if(id==='minmax') mm.init();
+  if(id==='mcm') mc.init();
+  if(id==='nqueens') nq.init();
+  if(id==='tsp') tsp.init();
+  if(id==='compare') drawCompareChart();
+}
+function showView(id){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+document.addEventListener('keydown', e=>{
+  const active = document.querySelector('.view.active').id;
+  if(active==='module-minmax'){
+    if(e.code==='ArrowRight') mm.stepFwd();
+    if(e.code==='ArrowLeft') mm.stepBack();
+    if(e.code==='Space'){ e.preventDefault(); mm.togglePlay(); }
+  }
+  if(active==='module-mcm'){
+    if(e.code==='ArrowRight') mc.stepFwd();
+    if(e.code==='ArrowLeft') mc.stepBack();
+    if(e.code==='Space'){ e.preventDefault(); mc.togglePlay(); }
+  }
+  if(active==='module-nqueens'){
+    if(e.code==='ArrowRight') nq.stepFwd();
+    if(e.code==='ArrowLeft') nq.stepBack();
+    if(e.code==='Space'){ e.preventDefault(); nq.togglePlay(); }
+  }
+  if(active==='module-tsp'){
+    if(e.code==='ArrowRight') tsp.stepFwd();
+    if(e.code==='ArrowLeft') tsp.stepBack();
+    if(e.code==='Space'){ e.preventDefault(); tsp.togglePlay(); }
+  }
+});
+
+/* =========================================================
+   MODULE 1: MIN-MAX DIVIDE & CONQUER
+   ========================================================= */
+const MM_ARR = [3, 1, 7, 4, 9, 2, 8, 5, 6, 0];
+
+const MM_PSEUDO = [
+  {t:'function <span class="fn">minMax</span>(low, high):', k:'enter'},
+  {t:'  <span class="kw">if</span> low == high: <span class="kw">return</span> arr[low], arr[low]', k:'base-single'},
+  {t:'  <span class="kw">if</span> high == low + 1:', k:'base-pair'},
+  {t:'    compare arr[low], arr[high]   <span class="num">// 1 comparison</span>', k:'base-pair'},
+  {t:'    <span class="kw">return</span> (min, max) of the pair', k:'base-pair'},
+  {t:'  mid = (low + high) // 2', k:'split'},
+  {t:'  (lmin, lmax) = <span class="fn">minMax</span>(low, mid)', k:'split'},
+  {t:'  (rmin, rmax) = <span class="fn">minMax</span>(mid+1, high)', k:'split'},
+  {t:'  overall_min = <span class="kw">min</span>(lmin, rmin)   <span class="num">// 1 comparison</span>', k:'combine-min'},
+  {t:'  overall_max = <span class="kw">max</span>(lmax, rmax)   <span class="num">// 1 comparison</span>', k:'combine-max'},
+  {t:'  <span class="kw">return</span> overall_min, overall_max', k:'return'},
+];
+
+function traceMinMax(arr){
+  let steps = [];
+  let compCount = 0;
+  function rec(low, high, depth, path){
+    steps.push({type:'enter', low, high, depth, path, compCount});
+    if(low===high){
+      steps.push({type:'base-single', low, high, val:arr[low], depth, path, compCount});
+      return {min:arr[low], max:arr[low]};
+    }
+    if(high===low+1){
+      compCount++;
+      let mn,mx;
+      if(arr[low]<arr[high]){mn=arr[low];mx=arr[high];} else {mn=arr[high];mx=arr[low];}
+      steps.push({type:'base-pair', low, high, a:arr[low], b:arr[high], min:mn, max:mx, depth, path, compCount});
+      return {min:mn, max:mx};
+    }
+    let mid = Math.floor((low+high)/2);
+    steps.push({type:'split', low, high, mid, depth, path, compCount});
+    let left = rec(low, mid, depth+1, path+'L');
+    let right = rec(mid+1, high, depth+1, path+'R');
+    compCount++;
+    let overallMin = left.min < right.min ? left.min : right.min;
+    steps.push({type:'combine-min', low, high, leftMin:left.min, rightMin:right.min, overallMin, depth, path, compCount});
+    compCount++;
+    let overallMax = left.max > right.max ? left.max : right.max;
+    steps.push({type:'combine-max', low, high, leftMax:left.max, rightMax:right.max, overallMax, depth, path, compCount});
+    steps.push({type:'return', low, high, min:overallMin, max:overallMax, depth, path, compCount});
+    return {min:overallMin, max:overallMax};
+  }
+  rec(0, arr.length-1, 0, '');
+  return steps;
+}
+
+const mm = {
+  steps: [], idx: -1, timer: null, playing:false,
+  init(){
+    this.steps = traceMinMax(MM_ARR);
+    this.idx = -1;
+    this.renderCode();
+    this.renderBars();
+    this.renderTraceSkeleton();
+    this.updateUI();
+  },
+  renderCode(){
+    document.getElementById('mm-code').innerHTML = MM_PSEUDO.map((l,i)=>`<span class="l" data-i="${i}">${l.t}</span>`).join('\n');
+  },
+  renderBars(){
+    const wrap = document.getElementById('mm-bars');
+    const maxV = Math.max(...MM_ARR);
+    wrap.innerHTML = MM_ARR.map((v,i)=>`
+      <div class="bar-wrap" id="mm-barwrap-${i}">
+        <div class="bar" id="mm-bar-${i}" style="height:${10+ (v/maxV)*100}px"></div>
+        <div class="bar-val">${v}</div>
+        <div class="bar-idx">${i}</div>
+      </div>`).join('');
+  },
+  renderTraceSkeleton(){
+    document.getElementById('mm-trace').innerHTML = '';
+  },
+  describe(s){
+    switch(s.type){
+      case 'enter': return `Call minMax(low=${s.low}, high=${s.high}) on range [${s.low}..${s.high}].`;
+      case 'base-single': return `Base case: single element at index ${s.low} (value ${s.val}) — it is trivially both the min and max.`;
+      case 'base-pair': return `Base case: two elements — compare arr[${s.low}]=${s.a} and arr[${s.high}]=${s.b} → min=${s.min}, max=${s.max}. (+1 comparison)`;
+      case 'split': return `Split [${s.low}..${s.high}] at mid=${s.mid} into left [${s.low}..${s.mid}] and right [${s.mid+1}..${s.high}].`;
+      case 'combine-min': return `Combine step: compare left min (${s.leftMin}) vs right min (${s.rightMin}) → overall min = ${s.overallMin}. (+1 comparison)`;
+      case 'combine-max': return `Combine step: compare left max (${s.leftMax}) vs right max (${s.rightMax}) → overall max = ${s.overallMax}. (+1 comparison)`;
+      case 'return': return `Return from range [${s.low}..${s.high}] with min=${s.min}, max=${s.max}.`;
+    }
+  },
+  traceLine(s){
+    const indent = '  '.repeat(s.depth);
+    switch(s.type){
+      case 'enter': return `${indent}minMax(${s.low}, ${s.high})`;
+      case 'base-single': return `${indent}→ single: (${s.val}, ${s.val})`;
+      case 'base-pair': return `${indent}→ pair cmp: (${s.min}, ${s.max})`;
+      case 'split': return `${indent}mid=${s.mid} → split`;
+      case 'combine-min': return `${indent}min(${s.leftMin},${s.rightMin}) = ${s.overallMin}`;
+      case 'combine-max': return `${indent}max(${s.leftMax},${s.rightMax}) = ${s.overallMax}`;
+      case 'return': return `${indent}← return (${s.min}, ${s.max})`;
+    }
+  },
+  render(){
+    const bars = MM_ARR.map((_,i)=>document.getElementById('mm-bar-'+i));
+    bars.forEach(b=>b.classList.remove('inrange','compare','result'));
+    if(this.idx < 0){
+      document.getElementById('mm-caption').textContent = 'Press Play or Step ▸ to begin.';
+      document.getElementById('mm-range').textContent = '—';
+      document.getElementById('mm-depth').textContent = '0';
+      document.getElementById('mm-comps').textContent = '0';
+      document.querySelectorAll('#mm-code .l').forEach(l=>l.classList.remove('active'));
+      return;
+    }
+    const s = this.steps[this.idx];
+    for(let i=s.low;i<=s.high;i++) bars[i] && bars[i].classList.add('inrange');
+    if(s.type==='base-pair'){ bars[s.low].classList.add('compare'); bars[s.high].classList.add('compare'); }
+    if(s.type==='base-single'){ bars[s.low].classList.add('result'); }
+    if(s.type==='return' && s.depth===0){
+      for(let i=s.low;i<=s.high;i++) bars[i].classList.add('result');
+    }
+    document.getElementById('mm-caption').textContent = this.describe(s);
+    document.getElementById('mm-range').textContent = `[${s.low} .. ${s.high}]`;
+    document.getElementById('mm-depth').textContent = s.depth;
+    document.getElementById('mm-comps').textContent = s.compCount;
+
+    document.querySelectorAll('#mm-code .l').forEach(l=>l.classList.remove('active'));
+    const lineIdx = MM_PSEUDO.findIndex(l=>l.k===s.type);
+    if(lineIdx>=0) document.querySelector(`#mm-code .l[data-i="${lineIdx}"]`).classList.add('active');
+
+    const log = document.getElementById('mm-trace');
+    const lines = this.steps.slice(0,this.idx+1).map((st,i)=>
+      `<div class="line ${i===this.idx?'active':'done'}" style="--d:${st.depth}">${this.traceLine(st)}</div>`).join('');
+    log.innerHTML = lines;
+    log.scrollTop = log.scrollHeight;
+  },
+  updateUI(){
+    document.getElementById('mm-counter').textContent = `Step ${this.idx+1} / ${this.steps.length}`;
+    this.render();
+  },
+  stepFwd(){ if(this.idx < this.steps.length-1){ this.idx++; this.updateUI(); } else { this.pause(); } },
+  stepBack(){ if(this.idx > -1){ this.idx--; this.updateUI(); } },
+  reset(){ this.pause(); this.idx=-1; this.updateUI(); },
+  togglePlay(){ this.playing ? this.pause() : this.play(); },
+  play(){
+    this.playing = true;
+    document.getElementById('mm-play').textContent = '⏸ Pause';
+    const speed = ()=>2300 - Number(document.getElementById('mm-speed').value);
+    const tick = ()=>{
+      if(!this.playing) return;
+      if(this.idx >= this.steps.length-1){ this.pause(); return; }
+      this.stepFwd();
+      this.timer = setTimeout(tick, speed());
+    };
+    tick();
+  },
+  pause(){ this.playing=false; clearTimeout(this.timer); document.getElementById('mm-play').textContent='▶ Play'; }
+};
+
+/* =========================================================
+   MODULE 2: MATRIX CHAIN MULTIPLICATION
+   ========================================================= */
+const MC_DIMS = [10, 30, 5, 60, 10];
+
+const MC_PSEUDO = [
+  {t:'<span class="kw">for</span> l = 2 to n:                    <span class="num">// chain length</span>', k:'l'},
+  {t:'  <span class="kw">for</span> i = 1 to n-l+1:', k:'ij'},
+  {t:'    j = i + l - 1', k:'ij'},
+  {t:'    m[i][j] = <span class="kw">infinity</span>', k:'ij'},
+  {t:'    <span class="kw">for</span> k = i to j-1:', k:'try-k'},
+  {t:'      cost = m[i][k] + m[k+1][j] + dims[i-1]·dims[k]·dims[j]', k:'try-k'},
+  {t:'      <span class="kw">if</span> cost &lt; m[i][j]:', k:'update-best'},
+  {t:'        m[i][j] = cost;  s[i][j] = k', k:'update-best'},
+];
+
+function traceMCM(dims){
+  const n = dims.length - 1;
+  const m = Array.from({length:n+1}, ()=>Array(n+1).fill(0));
+  const s = Array.from({length:n+1}, ()=>Array(n+1).fill(0));
+  const steps = [];
+  for(let l=2; l<=n; l++){
+    for(let i=1; i<=n-l+1; i++){
+      const j = i + l - 1;
+      m[i][j] = Infinity;
+      steps.push({type:'start-cell', i, j, l});
+      for(let k=i; k<j; k++){
+        const cost = m[i][k] + m[k+1][j] + dims[i-1]*dims[k]*dims[j];
+        const before = m[i][j];
+        steps.push({type:'try-k', i, j, k, cost, mik:m[i][k], mkj:m[k+1][j], term:dims[i-1]*dims[k]*dims[j], currentBest: before===Infinity? null: before});
+        if(cost < m[i][j]){
+          m[i][j] = cost; s[i][j] = k;
+          steps.push({type:'update-best', i, j, k, cost});
+        }
+      }
+      steps.push({type:'set-cell', i, j, value:m[i][j], split:s[i][j]});
+    }
+  }
+  return {steps, m, s, n};
+}
+
+function buildParens(s, i, j){
+  if(i===j) return `A${i}`;
+  const k = s[i][j];
+  return `(${buildParens(s,i,k)} × ${buildParens(s,k+1,j)})`;
+}
+
+const mc = {
+  steps:[], idx:-1, timer:null, playing:false, m:null, s:null, n:0,
+  init(){
+    const r = traceMCM(MC_DIMS);
+    this.steps = r.steps; this.m = r.m; this.s = r.s; this.n = r.n; this.idx = -1;
+    this.renderCode();
+    this.renderTable();
+    this.updateUI();
+    document.getElementById('mc-paren').textContent = '—';
+  },
+  renderCode(){
+    document.getElementById('mc-code').innerHTML = MC_PSEUDO.map((l,i)=>`<span class="l" data-i="${i}">${l.t}</span>`).join('\n');
+  },
+  renderTable(){
+    const n = this.n;
+    let html = '<tr><th></th>' + Array.from({length:n},(_,j)=>`<th>A${j+1}</th>`).join('') + '</tr>';
+    for(let i=1;i<=n;i++){
+      html += `<tr><th>A${i}</th>`;
+      for(let j=1;j<=n;j++){
+        if(j<i) html += `<td class="cell dash">·</td>`;
+        else if(j===i) html += `<td class="cell filled" id="mc-cell-${i}-${j}">0</td>`;
+        else html += `<td class="cell" id="mc-cell-${i}-${j}"></td>`;
+      }
+      html += '</tr>';
+    }
+    document.getElementById('mc-table').innerHTML = html;
+  },
+  describe(s){
+    switch(s.type){
+      case 'start-cell': return `Start solving chain length ${s.l}: cell m[${s.i}][${s.j}] (matrices A${s.i}..A${s.j}). Initialize to infinity.`;
+      case 'try-k': return `Try split at k=${s.k}: cost = m[${s.i}][${s.k}](${s.mik}) + m[${s.k+1}][${s.j}](${s.mkj}) + dims[${s.i-1}]·dims[${s.k}]·dims[${s.j}](${s.term}) = ${s.cost}.`;
+      case 'update-best': return `New best split found at k=${s.k}: m[${s.i}][${s.j}] updated to ${s.cost}.`;
+      case 'set-cell': return `Cell m[${s.i}][${s.j}] finalized = ${s.value}, best split at k=${s.split}.`;
+    }
+  },
+  render(){
+    document.querySelectorAll('#mc-table td.cell').forEach(td=>td.classList.remove('active'));
+    if(this.idx < 0){
+      document.getElementById('mc-caption').textContent = 'Press Play or Step ▸ to begin.';
+      document.getElementById('mc-formula').textContent = 'Waiting to start…';
+      document.querySelectorAll('#mc-code .l').forEach(l=>l.classList.remove('active'));
+      return;
+    }
+    const s = this.steps[this.idx];
+    const cell = document.getElementById(`mc-cell-${s.i}-${s.j}`);
+    if(cell) cell.classList.add('active');
+    document.getElementById('mc-caption').textContent = this.describe(s);
+
+    let f = '';
+    if(s.type==='start-cell') f = `m[${s.i}][${s.j}] = ∞  (chain length ${s.l})`;
+    if(s.type==='try-k') f = `k=${s.k}:  m[${s.i}][${s.k}] + m[${s.k+1}][${s.j}] + dims[${s.i-1}]·dims[${s.k}]·dims[${s.j}]\n= ${s.mik} + ${s.mkj} + ${s.term}  =  <span class="hl">${s.cost}</span>  ${s.currentBest!==null? `(current best: ${s.currentBest})`:''}`;
+    if(s.type==='update-best') f = `<span class="win">cost ${s.cost} &lt; previous best → m[${s.i}][${s.j}] = ${s.cost}, s[${s.i}][${s.j}] = ${s.k}</span>`;
+    if(s.type==='set-cell') f = `<span class="win">m[${s.i}][${s.j}] finalized = ${s.value}</span>`;
+    document.getElementById('mc-formula').innerHTML = f;
+
+    document.querySelectorAll('#mc-code .l').forEach(l=>l.classList.remove('active'));
+    const lineIdx = MC_PSEUDO.findIndex(l=>l.k===s.type);
+    if(lineIdx>=0) document.querySelector(`#mc-code .l[data-i="${lineIdx}"]`).classList.add('active');
+
+    // fill in cells for every set-cell step up to now
+    for(let k=0;k<=this.idx;k++){
+      const st = this.steps[k];
+      if(st.type==='set-cell'){
+        const c = document.getElementById(`mc-cell-${st.i}-${st.j}`);
+        if(c){ c.textContent = st.value; c.classList.add('filled'); }
+      }
+    }
+    // clear cells that haven't been set yet (in case of stepping back)
+    for(let i=1;i<=this.n;i++) for(let j=i+1;j<=this.n;j++){
+      const wasSet = this.steps.slice(0,this.idx+1).some(st=>st.type==='set-cell'&&st.i===i&&st.j===j);
+      const c = document.getElementById(`mc-cell-${i}-${j}`);
+      if(c && !wasSet){ c.textContent=''; c.classList.remove('filled'); }
+    }
+
+    if(s.type==='set-cell' && s.i===1 && s.j===this.n){
+      document.getElementById('mc-paren').textContent = buildParens(this.s, 1, this.n);
+    } else if(this.idx < this.steps.length-1 || !(s.type==='set-cell' && s.i===1 && s.j===this.n)){
+      const final = this.steps.slice(0,this.idx+1).some(st=>st.type==='set-cell'&&st.i===1&&st.j===this.n);
+      document.getElementById('mc-paren').textContent = final ? buildParens(this.s,1,this.n) : '—';
+    }
+  },
+  updateUI(){
+    document.getElementById('mc-counter').textContent = `Step ${this.idx+1} / ${this.steps.length}`;
+    this.render();
+  },
+  stepFwd(){ if(this.idx < this.steps.length-1){ this.idx++; this.updateUI(); } else { this.pause(); } },
+  stepBack(){ if(this.idx > -1){ this.idx--; this.updateUI(); } },
+  reset(){ this.pause(); this.idx=-1; this.updateUI(); this.renderTable(); },
+  togglePlay(){ this.playing ? this.pause() : this.play(); },
+  play(){
+    this.playing = true;
+    document.getElementById('mc-play').textContent = '⏸ Pause';
+    const speed = ()=>1900 - Number(document.getElementById('mc-speed').value);
+    const tick = ()=>{
+      if(!this.playing) return;
+      if(this.idx >= this.steps.length-1){ this.pause(); return; }
+      this.stepFwd();
+      this.timer = setTimeout(tick, speed());
+    };
+    tick();
+  },
+  pause(){ this.playing=false; clearTimeout(this.timer); document.getElementById('mc-play').textContent='▶ Play'; }
+};
+
+/* =========================================================
+   MODULE 3: N-QUEENS BACKTRACKING
+   ========================================================= */
+const NQ_PSEUDO = [
+  {t:'function <span class="fn">isSafe</span>(row, col):', k:'try'},
+  {t:'  <span class="kw">for</span> each previously placed row: check column &amp; diagonal', k:'try'},
+  {t:'function <span class="fn">backtrack</span>(row):', k:'solution'},
+  {t:'  <span class="kw">if</span> row == n: record solution; <span class="kw">return</span>', k:'solution'},
+  {t:'  <span class="kw">for</span> col in 0..n-1:', k:'try'},
+  {t:'    <span class="kw">if</span> isSafe(row, col):', k:'reject'},
+  {t:'      place queen; <span class="fn">backtrack</span>(row+1)', k:'place'},
+  {t:'      remove queen   <span class="num">// undo / backtrack</span>', k:'undo'},
+];
+
+function traceNQueens(n){
+  const steps = [];
+  const board = new Array(n).fill(-1);
+  let backtrackCount = 0;
+  let solutionCount = 0;
+  function isSafe(row, col){
+    for(let pr=0; pr<row; pr++){
+      const placed = board[pr];
+      if(placed===col) return false;
+      if(Math.abs(pr-row)===Math.abs(placed-col)) return false;
+    }
+    return true;
+  }
+  function backtrack(row){
+    if(row===n){
+      solutionCount++;
+      steps.push({type:'solution', row, board:board.slice(), solutionCount});
+      return;
+    }
+    for(let col=0; col<n; col++){
+      steps.push({type:'try', row, col, board:board.slice(), backtrackCount, solutionCount});
+      if(isSafe(row,col)){
+        board[row]=col;
+        steps.push({type:'place', row, col, board:board.slice(), backtrackCount, solutionCount});
+        backtrack(row+1);
+        board[row]=-1;
+        backtrackCount++;
+        steps.push({type:'undo', row, col, board:board.slice(), backtrackCount, solutionCount});
+      } else {
+        steps.push({type:'reject', row, col, board:board.slice(), backtrackCount, solutionCount});
+      }
+    }
+  }
+  backtrack(0);
+  return {steps, solutionCount, backtrackCount};
+}
+
+const nq = {
+  n:4, steps:[], idx:-1, timer:null, playing:false,
+  init(){
+    this.setN(this.n, true);
+  },
+  setN(n, silent){
+    this.pause();
+    this.n = n;
+    document.querySelectorAll('.nq-controls-extra button').forEach(b=>b.classList.remove('active'));
+    const btn = document.getElementById('nq-n-'+n);
+    if(btn) btn.classList.add('active');
+    const r = traceNQueens(n);
+    this.steps = r.steps; this.idx = -1;
+    this.renderCode();
+    this.renderBoardShell();
+    this.updateUI();
+  },
+  renderCode(){
+    document.getElementById('nq-code').innerHTML = NQ_PSEUDO.map((l,i)=>`<span class="l" data-i="${i}">${l.t}</span>`).join('\n');
+  },
+  renderBoardShell(){
+    const n = this.n;
+    const wrap = document.getElementById('nq-board');
+    wrap.style.gridTemplateColumns = `repeat(${n}, 1fr)`;
+    let html = '';
+    for(let r=0;r<n;r++) for(let c=0;c<n;c++) html += `<div class="nq-cell" id="nq-cell-${r}-${c}"></div>`;
+    wrap.innerHTML = html;
+  },
+  describe(s){
+    switch(s.type){
+      case 'try': return `Row ${s.row}: checking whether column ${s.col} is safe (no shared column or diagonal with rows above).`;
+      case 'reject': return `Row ${s.row}, column ${s.col} conflicts with an existing queen — skip to the next column.`;
+      case 'place': return `Row ${s.row}, column ${s.col} is safe — place a queen there and move on to row ${s.row+1}.`;
+      case 'undo': return `Backtrack: remove the queen from row ${s.row}, column ${s.col} and try the next column. (+1 backtrack)`;
+      case 'solution': return `Row ${s.row} reached — a complete, valid arrangement of ${this.n} queens has been found.`;
+    }
+  },
+  traceLine(s){
+    switch(s.type){
+      case 'try': return `row ${s.row}: try col ${s.col}`;
+      case 'reject': return `  ✗ conflict at col ${s.col}`;
+      case 'place': return `  ✓ place col ${s.col}`;
+      case 'undo': return `  ↩ undo col ${s.col}`;
+      case 'solution': return `★ solution recorded`;
+    }
+  },
+  render(){
+    document.querySelectorAll('.nq-cell').forEach(c=>{ c.classList.remove('trying','reject','rowactive'); });
+    if(this.idx < 0){
+      document.getElementById('nq-caption').textContent = 'Press Play or Step ▸ to begin.';
+      document.getElementById('nq-backtracks').textContent = '0';
+      document.getElementById('nq-solutions').textContent = '0';
+      document.getElementById('nq-row').textContent = '0';
+      document.querySelectorAll('#nq-code .l').forEach(l=>l.classList.remove('active'));
+      document.querySelectorAll('.nq-cell').forEach(c=>c.innerHTML='');
+      return;
+    }
+    const s = this.steps[this.idx];
+    // draw current board state
+    for(let r=0;r<this.n;r++) for(let c=0;c<this.n;c++){
+      const cell = document.getElementById(`nq-cell-${r}-${c}`);
+      cell.innerHTML = (s.board[r]===c) ? '<span class="nq-queen">♛</span>' : '';
+    }
+    if(s.type==='try' || s.type==='place'){
+      const cell = document.getElementById(`nq-cell-${s.row}-${s.col}`);
+      if(cell) cell.classList.add('trying');
+    }
+    if(s.type==='reject'){
+      const cell = document.getElementById(`nq-cell-${s.row}-${s.col}`);
+      if(cell) cell.classList.add('reject');
+    }
+    for(let c=0;c<this.n;c++){
+      const cell = document.getElementById(`nq-cell-${s.row}-${c}`);
+      if(cell) cell.classList.add('rowactive');
+    }
+    document.getElementById('nq-caption').textContent = this.describe(s);
+    document.getElementById('nq-backtracks').textContent = s.backtrackCount ?? 0;
+    document.getElementById('nq-solutions').textContent = s.solutionCount ?? 0;
+    document.getElementById('nq-row').textContent = s.row;
+
+    document.querySelectorAll('#nq-code .l').forEach(l=>l.classList.remove('active'));
+    const lineIdx = NQ_PSEUDO.findIndex(l=>l.k===s.type);
+    if(lineIdx>=0) document.querySelector(`#nq-code .l[data-i="${lineIdx}"]`).classList.add('active');
+
+    const log = document.getElementById('nq-trace');
+    const lines = this.steps.slice(0,this.idx+1).map((st,i)=>
+      `<div class="line ${i===this.idx?'active':'done'}" style="--d:${st.row}">${this.traceLine(st)}</div>`).join('');
+    log.innerHTML = lines;
+    log.scrollTop = log.scrollHeight;
+  },
+  updateUI(){
+    document.getElementById('nq-counter').textContent = `Step ${this.idx+1} / ${this.steps.length}`;
+    this.render();
+  },
+  stepFwd(){ if(this.idx < this.steps.length-1){ this.idx++; this.updateUI(); } else { this.pause(); } },
+  stepBack(){ if(this.idx > -1){ this.idx--; this.updateUI(); } },
+  reset(){ this.pause(); this.idx=-1; this.updateUI(); },
+  togglePlay(){ this.playing ? this.pause() : this.play(); },
+  play(){
+    this.playing = true;
+    document.getElementById('nq-play').textContent = '⏸ Pause';
+    const speed = ()=>1550 - Number(document.getElementById('nq-speed').value);
+    const tick = ()=>{
+      if(!this.playing) return;
+      if(this.idx >= this.steps.length-1){ this.pause(); return; }
+      this.stepFwd();
+      this.timer = setTimeout(tick, speed());
+    };
+    tick();
+  },
+  pause(){ this.playing=false; clearTimeout(this.timer); document.getElementById('nq-play').textContent='▶ Play'; }
+};
+
+/* =========================================================
+   MODULE 4: TSP — EXHAUSTIVE PERMUTATION SEARCH
+   ========================================================= */
+const TSP_CITIES = ['A','B','C','D','E'];
+const TSP_COST = [
+  [Infinity, 10, 8, 9, 7],
+  [10, Infinity, 10, 5, 6],
+  [8, 10, Infinity, 8, 9],
+  [9, 5, 8, Infinity, 6],
+  [7, 6, 9, 6, Infinity]
+];
+const TSP_PSEUDO = [
+  {t:'cities = [1, 2, 3, 4]   <span class="num">// all but the start city</span>', k:'setup'},
+  {t:'<span class="kw">for</span> each permutation of cities:', k:'try-perm'},
+  {t:'  path = [0] + permutation + [0]', k:'try-perm'},
+  {t:'  cost = sum of edge costs along path', k:'try-perm'},
+  {t:'  <span class="kw">if</span> cost &lt; best_cost:', k:'new-best'},
+  {t:'    best_cost = cost; best_path = path', k:'new-best'},
+];
+
+function permute(arr){
+  if(arr.length<=1) return [arr.slice()];
+  const result = [];
+  for(let i=0;i<arr.length;i++){
+    const rest = arr.slice(0,i).concat(arr.slice(i+1));
+    for(const p of permute(rest)) result.push([arr[i], ...p]);
+  }
+  return result;
+}
+
+function traceTSPBrute(cost, n){
+  const cityIdx = [];
+  for(let i=1;i<n;i++) cityIdx.push(i);
+  const perms = permute(cityIdx); // lexicographic, matches itertools.permutations for sorted input
+  const steps = [];
+  let bestCost = Infinity, bestPath = null;
+  perms.forEach((perm, idx)=>{
+    const path = [0, ...perm, 0];
+    let c = 0;
+    for(let i=0;i<path.length-1;i++) c += cost[path[i]][path[i+1]];
+    const isNewBest = c < bestCost;
+    if(isNewBest){ bestCost = c; bestPath = path; }
+    steps.push({type: isNewBest ? 'new-best':'try-perm', path, cost:c, idx, total:perms.length, bestCost, bestPath: bestPath.slice()});
+  });
+  return {steps, bestCost, bestPath, totalPerms:perms.length};
+}
+
+const tsp = {
+  steps:[], idx:-1, timer:null, playing:false,
+  cityPos:[[180,30],[330,110],[280,260],[80,260],[30,110]], // pentagon layout for A..E
+  init(){
+    const r = traceTSPBrute(TSP_COST, TSP_CITIES.length);
+    this.steps = r.steps; this.idx = -1;
+    this.renderCode();
+    document.getElementById('tsp-permlist').innerHTML='';
+    this.updateUI();
+  },
+  renderCode(){
+    document.getElementById('tsp-code').innerHTML = TSP_PSEUDO.map((l,i)=>`<span class="l" data-i="${i}">${l.t}</span>`).join('\n');
+  },
+  edgeKey(u,v){ return u<v ? `${u}-${v}` : `${v}-${u}`; }
+  ,
+  describe(s){
+    const names = s.path.map(i=>TSP_CITIES[i]).join(' → ');
+    if(s.type==='new-best') return `Tour ${names} costs ${s.cost} — cheaper than the previous best, so this becomes the new best tour.`;
+    return `Tour ${names} costs ${s.cost} — not better than the current best (${s.bestCost}), so it's discarded.`;
+  },
+  renderMap(s){
+    const svg = document.getElementById('tsp-map');
+    const pos = this.cityPos;
+    let edges = '';
+    if(s){
+      for(let i=0;i<s.bestPath.length-1;i++){
+        const u=s.bestPath[i], v=s.bestPath[i+1];
+        edges += `<line class="tsp-edge best" x1="${pos[u][0]}" y1="${pos[u][1]}" x2="${pos[v][0]}" y2="${pos[v][1]}"/>`;
+      }
+      for(let i=0;i<s.path.length-1;i++){
+        const u=s.path[i], v=s.path[i+1];
+        edges += `<line class="tsp-edge current" x1="${pos[u][0]}" y1="${pos[u][1]}" x2="${pos[v][0]}" y2="${pos[v][1]}"/>`;
+      }
+    }
+    let nodes = pos.map((p,i)=>`
+      <circle class="tsp-city" cx="${p[0]}" cy="${p[1]}" r="16"/>
+      <text class="tsp-city-label" x="${p[0]}" y="${p[1]+4}" text-anchor="middle">${TSP_CITIES[i]}</text>`).join('');
+    svg.innerHTML = edges + nodes;
+  },
+  render(){
+    if(this.idx < 0){
+      document.getElementById('tsp-caption').textContent = 'Press Play or Step ▸ to begin.';
+      document.getElementById('tsp-permidx').textContent = `0 / ${this.steps.length}`;
+      document.getElementById('tsp-curcost').textContent = '—';
+      document.getElementById('tsp-bestcost').textContent = '∞';
+      document.querySelectorAll('#tsp-code .l').forEach(l=>l.classList.remove('active'));
+      this.renderMap(null);
+      return;
+    }
+    const s = this.steps[this.idx];
+    this.renderMap(s);
+    document.getElementById('tsp-caption').textContent = this.describe(s);
+    document.getElementById('tsp-permidx').textContent = `${s.idx+1} / ${s.total}`;
+    document.getElementById('tsp-curcost').textContent = s.cost;
+    document.getElementById('tsp-bestcost').textContent = s.bestCost;
+
+    document.querySelectorAll('#tsp-code .l').forEach(l=>l.classList.remove('active'));
+    const lineIdx = TSP_PSEUDO.findIndex(l=>l.k===s.type);
+    if(lineIdx>=0) document.querySelector(`#tsp-code .l[data-i="${lineIdx}"]`).classList.add('active');
+
+    const list = document.getElementById('tsp-permlist');
+    const rows = this.steps.slice(0,this.idx+1).map((st,i)=>{
+      const names = st.path.map(c=>TSP_CITIES[c]).join('-');
+      const cls = i===this.idx ? 'active' : (st.type==='new-best' ? 'best' : '');
+      return `<div class="p ${cls}"><span>${names}</span><span>${st.cost}</span></div>`;
+    }).join('');
+    list.innerHTML = rows;
+    list.scrollTop = list.scrollHeight;
+  },
+  updateUI(){
+    document.getElementById('tsp-counter').textContent = `Step ${this.idx+1} / ${this.steps.length}`;
+    this.render();
+  },
+  stepFwd(){ if(this.idx < this.steps.length-1){ this.idx++; this.updateUI(); } else { this.pause(); } },
+  stepBack(){ if(this.idx > -1){ this.idx--; this.updateUI(); } },
+  reset(){ this.pause(); this.idx=-1; this.updateUI(); },
+  togglePlay(){ this.playing ? this.pause() : this.play(); },
+  play(){
+    this.playing = true;
+    document.getElementById('tsp-play').textContent = '⏸ Pause';
+    const speed = ()=>2000 - Number(document.getElementById('tsp-speed').value);
+    const tick = ()=>{
+      if(!this.playing) return;
+      if(this.idx >= this.steps.length-1){ this.pause(); return; }
+      this.stepFwd();
+      this.timer = setTimeout(tick, speed());
+    };
+    tick();
+  },
+  pause(){ this.playing=false; clearTimeout(this.timer); document.getElementById('tsp-play').textContent='▶ Play'; }
+};
+
+/* =========================================================
+   COMPARISON CHART
+   ========================================================= */
+function factorial(k){ let r=1; for(let i=2;i<=k;i++) r*=i; return r; }
+
+function drawCompareChart(){
+  const svg = document.getElementById('cmp-chart');
+  const W=640,H=340, padL=54, padB=36, padT=16, padR=16;
+  // n capped at 10 for the factorial curves — beyond that they dwarf everything else even on a log scale
+  const ns = [2,3,4,5,6,7,8,9,10];
+  const mmVals = ns.map(n=> Math.max(1, 1.5*n-2));
+  const mcVals = ns.map(n=> Math.pow(n,3));
+  const nqVals = ns.map(n=> factorial(n));
+  const tspVals = ns.map(n=> factorial(Math.max(n-1,1)));
+  const allVals = mmVals.concat(mcVals, nqVals, tspVals);
+  const logMax = Math.ceil(Math.log10(Math.max(...allVals)));
+  const logMin = 0;
+  const x = i => padL + (i/(ns.length-1)) * (W-padL-padR);
+  const y = v => (H-padB) - ((Math.log10(Math.max(v,1))-logMin)/(logMax-logMin)) * (H-padB-padT);
+
+  let grid = '';
+  for(let g=0; g<=logMax; g++){
+    const yy = y(Math.pow(10,g));
+    grid += `<line x1="${padL}" y1="${yy}" x2="${W-padR}" y2="${yy}" stroke="rgba(0,229,255,0.08)"/>`;
+    grid += `<text x="${padL-8}" y="${yy+4}" text-anchor="end" font-family="monospace" font-size="10" fill="#6f84a6">10^${g}</text>`;
+  }
+  let xlabels = ns.map((n,i)=>`<text x="${x(i)}" y="${H-padB+18}" text-anchor="middle" font-family="monospace" font-size="10" fill="#6f84a6">n=${n}</text>`).join('');
+
+  function pathFor(vals, color){
+    const d = vals.map((v,i)=> `${i===0?'M':'L'} ${x(i)} ${y(v)}`).join(' ');
+    const dots = vals.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="3.5" fill="${color}" style="filter:drop-shadow(0 0 4px ${color})"/>`).join('');
+    return `<path d="${d}" fill="none" stroke="${color}" stroke-width="2" style="filter:drop-shadow(0 0 5px ${color})"/>${dots}`;
+  }
+
+  svg.innerHTML = `
+    <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H-padB}" stroke="rgba(0,229,255,0.3)"/>
+    <line x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" stroke="rgba(0,229,255,0.3)"/>
+    ${grid}
+    ${xlabels}
+    ${pathFor(mmVals, '#00e5ff')}
+    ${pathFor(mcVals, '#b06bff')}
+    ${pathFor(nqVals, '#ffb300')}
+    ${pathFor(tspVals, '#ff4d6d')}
+  `;
+}
+</script>
+</body>
+</html>
