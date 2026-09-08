@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quicksort // Deterministic vs Randomized — Algorithm Console</title>
+<style>
+  :root{
+    --bg:#070a12;
+    --bg-panel:#0c1120;
+    --bg-panel-2:#0f1626;
+    --line:#1c2740;
+    --line-soft:#141b2e;
+    --cyan:#5be7f0;
+    --cyan-dim:#2a7d86;
+    --violet:#a78bfa;
+    --amber:#ffb454;
+    --red:#ff6b7d;
+    --green:#5be89a;
+    --text:#dce6f5;
+    --text-dim:#7f8db3;
+    --text-faint:#4b5876;
+    --mono: "JetBrains Mono","SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    --sans: -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(91,231,240,0.07), transparent 60%),
+      radial-gradient(ellipse 900px 600px at 100% 10%, rgba(167,139,250,0.06), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+  body::before{
+    content:"";
+    position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image:
+      linear-gradient(rgba(91,231,240,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(91,231,240,0.035) 1px, transparent 1px);
+    background-size:42px 42px;
+    mask-image: radial-gradient(ellipse 100% 60% at 50% 0%, black, transparent 75%);
+  }
+  .app{position:relative; z-index:1; max-width:1180px; margin:0 auto; padding:28px 24px 80px;}
+
+  /* ---------- top bar ---------- */
+  .topbar{display:flex; align-items:baseline; justify-content:space-between; gap:16px; padding-bottom:22px; border-bottom:1px solid var(--line);}
+  .brand{display:flex; flex-direction:column; gap:3px;}
+  .brand .mark{font-family:var(--mono); font-size:12px; letter-spacing:0.14em; color:var(--cyan); text-transform:uppercase;}
+  .brand h1{margin:0; font-size:22px; font-weight:600; letter-spacing:-0.01em;}
+  .brand .sub{font-size:13px; color:var(--text-dim);}
+  nav.crumbs{font-family:var(--mono); font-size:12.5px; color:var(--text-faint); display:flex; gap:8px; align-items:center;}
+  nav.crumbs button{background:none;border:none;color:var(--text-dim);font-family:var(--mono);font-size:12.5px;cursor:pointer;padding:0;}
+  nav.crumbs button:hover{color:var(--cyan);}
+  nav.crumbs .sep{color:var(--text-faint);}
+  nav.crumbs .here{color:var(--cyan);}
+
+  /* ---------- views ---------- */
+  .view{display:none; animation:fadein .45s ease both;}
+  .view.active{display:block;}
+  @keyframes fadein{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);}}
+
+  /* ---------- hub ---------- */
+  .hub-intro{margin:34px 0 26px; max-width:640px;}
+  .hub-intro p{color:var(--text-dim); line-height:1.65; font-size:15px;}
+  .node-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:18px;}
+  .node-card{
+    position:relative; background:linear-gradient(180deg,var(--bg-panel-2),var(--bg-panel));
+    border:1px solid var(--line); border-radius:4px; padding:22px 22px 20px; cursor:pointer;
+    transition:border-color .25s ease, transform .25s ease, box-shadow .25s ease;
+  }
+  .node-card:hover{border-color:var(--cyan-dim); transform:translateY(-2px); box-shadow:0 8px 30px rgba(91,231,240,0.08);}
+  .node-card::before{
+    content:""; position:absolute; top:0; left:18px; right:18px; height:1px;
+    background:linear-gradient(90deg, transparent, var(--cyan), transparent);
+    opacity:0; transition:opacity .25s ease;
+  }
+  .node-card:hover::before{opacity:.8;}
+  .node-card .tag{font-family:var(--mono); font-size:11px; letter-spacing:.1em; color:var(--violet); text-transform:uppercase;}
+  .node-card h3{margin:8px 0 8px; font-size:18px; font-weight:600;}
+  .node-card p{margin:0 0 16px; font-size:13.5px; color:var(--text-dim); line-height:1.55;}
+  .badge-row{display:flex; gap:8px; flex-wrap:wrap;}
+  .badge{
+    font-family:var(--mono); font-size:11px; padding:3px 8px; border-radius:3px;
+    border:1px solid var(--line); color:var(--text-dim); background:rgba(255,255,255,0.02);
+  }
+  .badge.b-worst{color:var(--red); border-color:rgba(255,107,125,0.3);}
+  .badge.b-avg{color:var(--amber); border-color:rgba(255,180,84,0.3);}
+  .badge.b-best{color:var(--green); border-color:rgba(91,232,154,0.3);}
+  .node-card .enter{position:absolute; right:20px; bottom:18px; font-family:var(--mono); font-size:11px; color:var(--text-faint);}
+  .node-card:hover .enter{color:var(--cyan);}
+
+  .compare-card{
+    margin-top:16px; grid-column:1/-1;
+  }
+
+  /* ---------- module header ---------- */
+  .module-head{margin:26px 0 18px;}
+  .module-head .eyebrow{font-family:var(--mono); font-size:12px; color:var(--violet); letter-spacing:.08em;}
+  .module-head h2{margin:6px 0 10px; font-size:24px;}
+  .aim{color:var(--text-dim); font-size:14.5px; line-height:1.6; max-width:760px;}
+
+  /* ---------- mode toggle ---------- */
+  .mode-toggle{display:inline-flex; border:1px solid var(--line); border-radius:4px; overflow:hidden; margin:14px 0 20px;}
+  .mode-toggle button{
+    background:var(--bg-panel); color:var(--text-dim); border:none; padding:9px 18px;
+    font-family:var(--mono); font-size:12.5px; cursor:pointer; letter-spacing:.03em;
+    border-right:1px solid var(--line); transition:all .2s ease;
+  }
+  .mode-toggle button:last-child{border-right:none;}
+  .mode-toggle button.active{background:rgba(91,231,240,0.09); color:var(--cyan);}
+  .mode-toggle button:hover:not(.active){color:var(--text);}
+
+  /* ---------- main grid ---------- */
+  .work-grid{display:grid; grid-template-columns:1.35fr 1fr; gap:18px; align-items:start;}
+  @media (max-width:880px){ .work-grid{grid-template-columns:1fr;} }
+
+  .panel{
+    background:var(--bg-panel); border:1px solid var(--line); border-radius:4px; padding:18px 18px 16px;
+  }
+  .panel h4{margin:0 0 12px; font-size:12px; text-transform:uppercase; letter-spacing:.1em; color:var(--text-faint); font-weight:600;}
+
+  /* ---------- visualizer ---------- */
+  .stage{position:relative; height:300px; display:flex; align-items:flex-end; gap:3px; padding:10px 4px 28px;}
+  .bar{
+    flex:1; background:linear-gradient(180deg, rgba(91,231,240,0.55), rgba(91,231,240,0.12));
+    border:1px solid rgba(91,231,240,0.35); border-radius:2px 2px 0 0; position:relative;
+    transition:height .28s ease, background .18s ease, border-color .18s ease, transform .18s ease;
+    min-width:2px;
+  }
+  .bar.pivot{background:linear-gradient(180deg, rgba(167,139,250,0.85), rgba(167,139,250,0.25)); border-color:var(--violet); box-shadow:0 0 14px rgba(167,139,250,0.5);}
+  .bar.cmp{background:linear-gradient(180deg, rgba(255,180,84,0.85), rgba(255,180,84,0.25)); border-color:var(--amber); box-shadow:0 0 12px rgba(255,180,84,0.45);}
+  .bar.swap{background:linear-gradient(180deg, rgba(255,107,125,0.9), rgba(255,107,125,0.25)); border-color:var(--red); box-shadow:0 0 14px rgba(255,107,125,0.5); transform:translateY(-6px);}
+  .bar.sorted{background:linear-gradient(180deg, rgba(91,232,154,0.6), rgba(91,232,154,0.12)); border-color:rgba(91,232,154,0.5);}
+  .bar.range-out{opacity:0.22;}
+  .ptr{
+    position:absolute; bottom:-24px; font-family:var(--mono); font-size:10px; color:var(--text-dim);
+    transform:translateX(-50%); white-space:nowrap; transition:left .28s ease;
+  }
+  .ptr .arrow{display:block; text-align:center; color:inherit;}
+  .ptr.p-low{color:var(--cyan);}
+  .ptr.p-high{color:var(--red);}
+  .ptr.p-i{color:var(--green);}
+  .ptr.p-j{color:var(--amber);}
+
+  .caption{
+    font-family:var(--mono); font-size:13px; color:var(--text); min-height:40px;
+    padding:12px 14px; background:var(--bg-panel-2); border-left:2px solid var(--cyan); border-radius:0 3px 3px 0;
+    margin-top:14px; line-height:1.55;
+  }
+  .caption .num{color:var(--amber);}
+
+  .stat-row{display:flex; gap:18px; margin-top:14px; flex-wrap:wrap;}
+  .stat{font-family:var(--mono); font-size:12px; color:var(--text-dim);}
+  .stat b{color:var(--cyan); font-size:15px; display:block; font-family:var(--sans); font-weight:600;}
+
+  /* ---------- controls ---------- */
+  .controls{display:flex; align-items:center; gap:10px; margin-top:16px; flex-wrap:wrap;}
+  .ctl-btn{
+    background:var(--bg-panel-2); border:1px solid var(--line); color:var(--text); width:38px; height:34px;
+    border-radius:3px; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center;
+    transition:all .15s ease;
+  }
+  .ctl-btn:hover{border-color:var(--cyan-dim); color:var(--cyan);}
+  .ctl-btn.wide{width:auto; padding:0 16px; font-family:var(--mono); font-size:12px;}
+  .ctl-btn:disabled{opacity:.35; cursor:not-allowed;}
+  .step-count{font-family:var(--mono); font-size:12px; color:var(--text-dim); margin-left:4px;}
+  .speed-wrap{display:flex; align-items:center; gap:8px; margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--text-faint);}
+  input[type=range]{accent-color:var(--cyan); width:90px;}
+  .new-arr-btn{margin-left:8px;}
+
+  /* ---------- code panel ---------- */
+  pre.code{
+    margin:0; font-family:var(--mono); font-size:12.3px; line-height:1.85; color:var(--text-dim);
+    overflow-x:auto;
+  }
+  pre.code .ln{display:block; padding:1px 8px 1px 10px; border-radius:2px; border-left:2px solid transparent;}
+  pre.code .ln.active{background:rgba(91,231,240,0.09); border-left-color:var(--cyan); color:var(--text);}
+  pre.code .kw{color:var(--violet);}
+  pre.code .fn{color:var(--cyan);}
+  pre.code .cm{color:var(--text-faint); font-style:italic;}
+
+  .complexity-badges{display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;}
+
+  details.result-box{margin-top:16px; border:1px solid var(--line); border-radius:4px; background:var(--bg-panel-2);}
+  details.result-box summary{
+    cursor:pointer; padding:11px 14px; font-family:var(--mono); font-size:12px; color:var(--text-dim);
+    letter-spacing:.04em; list-style:none; display:flex; align-items:center; gap:8px;
+  }
+  details.result-box summary::-webkit-details-marker{display:none;}
+  details.result-box summary::before{content:"▸"; color:var(--cyan); transition:transform .2s ease;}
+  details.result-box[open] summary::before{transform:rotate(90deg);}
+  details.result-box .rbody{padding:0 16px 16px; font-size:13.5px; color:var(--text-dim); line-height:1.65;}
+
+  /* ---------- comparison view ---------- */
+  .cmp-controls{display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; align-items:center;}
+  select{background:var(--bg-panel-2); color:var(--text); border:1px solid var(--line); border-radius:3px; padding:7px 10px; font-family:var(--mono); font-size:12px;}
+  .chart-wrap{background:var(--bg-panel); border:1px solid var(--line); border-radius:4px; padding:20px;}
+  .legend{display:flex; gap:18px; margin-bottom:14px; font-family:var(--mono); font-size:11.5px; color:var(--text-dim);}
+  .legend span{display:inline-flex; align-items:center; gap:6px;}
+  .swatch{width:10px; height:10px; border-radius:2px; display:inline-block;}
+  .metric-note{font-size:12.5px; color:var(--text-faint); margin-top:12px; line-height:1.6;}
+
+  .back-link{display:inline-flex; align-items:center; gap:6px; background:none; border:none; color:var(--text-dim); font-family:var(--mono); font-size:12px; cursor:pointer; padding:0; margin-bottom:4px;}
+  .back-link:hover{color:var(--cyan);}
+
+  footer.note{margin-top:40px; padding-top:18px; border-top:1px solid var(--line); font-family:var(--mono); font-size:11px; color:var(--text-faint);}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <div class="brand">
+      <span class="mark">Algorithm Console · Exp 10</span>
+      <h1>Quicksort Holographic Suite</h1>
+      <span class="sub">Deterministic vs. randomized pivot selection, visualized step by step</span>
+    </div>
+    <nav class="crumbs">
+      <button onclick="goHub()">Hub</button>
+      <span id="crumbTail"></span>
+    </nav>
+  </div>
+
+  <!-- ================= HUB ================= -->
+  <section class="view active" id="view-hub">
+    <div class="hub-intro">
+      <p>One experiment detected in the source: a head-to-head comparison of <b style="color:var(--text)">deterministic</b> (last-element pivot) and <b style="color:var(--text)">randomized</b> quicksort, measured by comparison count and running time across random, sorted, reverse, and nearly-sorted inputs. Open the module to step through the partitioning live, or jump to the comparison view for the aggregate numbers.</p>
+    </div>
+    <div class="node-grid">
+      <div class="node-card" onclick="goModule()">
+        <span class="tag">Sorting · Array</span>
+        <h3>Quicksort — Deterministic vs Randomized</h3>
+        <p>Partition-based divide and conquer. Watch the pivot get chosen, the low/high pointers sweep the array, and elements swap into place — then compare how pivot strategy changes comparison counts on adversarial inputs.</p>
+        <div class="badge-row">
+          <span class="badge b-best">best Ω(n log n)</span>
+          <span class="badge b-avg">avg Θ(n log n)</span>
+          <span class="badge b-worst">worst O(n²)</span>
+        </div>
+        <span class="enter">open module →</span>
+      </div>
+
+      <div class="node-card compare-card" onclick="goCompare()">
+        <span class="tag">Aggregate</span>
+        <h3>Global Comparison View</h3>
+        <p>Bar chart of comparison counts and elapsed time for DQS vs RQS across all four input distributions, log-scaled — generated live in your browser, not copied from the source's sample run.</p>
+        <span class="enter">open chart →</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= MODULE ================= -->
+  <section class="view" id="view-module">
+    <button class="back-link" onclick="goHub()">← back to hub</button>
+    <div class="module-head">
+      <span class="eyebrow">Module 01</span>
+      <h2>Quicksort: Pivot Strategy Visualizer</h2>
+      <p class="aim">Aim: sort an array in place by repeatedly choosing a pivot, partitioning the array around it so smaller elements land left and larger ones land right, then recursing on each side. This module runs the exact partition logic from the source on a small array so every highlighted swap and comparison is real, not scripted.</p>
+    </div>
+
+    <div class="mode-toggle">
+      <button id="btn-det" class="active" onclick="setMode('det')">Deterministic (last element)</button>
+      <button id="btn-rand" onclick="setMode('rand')">Randomized (random swap-to-end)</button>
+    </div>
+
+    <div class="work-grid">
+      <div class="panel">
+        <h4>Array state</h4>
+        <div class="stage" id="stage"></div>
+        <div class="caption" id="caption">Press <span class="num">Step ▸</span> or <span class="num">Play</span> to begin.</div>
+        <div class="stat-row">
+          <div class="stat"><b id="statComparisons">0</b>comparisons</div>
+          <div class="stat"><b id="statSwaps">0</b>swaps</div>
+          <div class="stat"><b id="statDepth">0</b>recursion range</div>
+        </div>
+        <div class="controls">
+          <button class="ctl-btn" id="btnReset" title="Reset">⟲</button>
+          <button class="ctl-btn" id="btnBack" title="Step back">◂</button>
+          <button class="ctl-btn wide" id="btnPlay" title="Play/Pause">▶ Play</button>
+          <button class="ctl-btn" id="btnFwd" title="Step forward">▸</button>
+          <span class="step-count" id="stepCount">Step 0 / 0</span>
+          <div class="speed-wrap">
+            speed
+            <input type="range" id="speedSlider" min="1" max="10" value="5">
+          </div>
+          <button class="ctl-btn wide new-arr-btn" id="btnNewArr">New array</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h4>Pseudocode</h4>
+        <pre class="code" id="codeBlock"></pre>
+        <div class="complexity-badges" id="complexityBadges"></div>
+        <details class="result-box">
+          <summary>Result & inference</summary>
+          <div class="rbody">
+            Both variants produce the same sorted output; they differ only in how the pivot is chosen before partitioning. On already-sorted or reverse-sorted input, always picking the last element as pivot creates the most unbalanced possible splits, pushing deterministic quicksort toward its O(n²) worst case. Randomizing the pivot breaks that correlation with input order, so its comparison count stays close to the n log n average regardless of how the input arrives — the trade is a small amount of extra work (one random draw and swap per call) for protection against adversarial or already-structured input.
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= COMPARISON ================= -->
+  <section class="view" id="view-compare">
+    <button class="back-link" onclick="goHub()">← back to hub</button>
+    <div class="module-head">
+      <span class="eyebrow">Aggregate</span>
+      <h2>Comparisons across input distributions</h2>
+      <p class="aim">Each run below executes the same partition logic as the visualizer, at full scale, purely to count comparisons and measure elapsed time — computed live, not hand-entered.</p>
+    </div>
+
+    <div class="cmp-controls">
+      <label style="font-family:var(--mono); font-size:12px; color:var(--text-dim);">Array size (N)
+        <select id="nSelect">
+          <option value="500">500</option>
+          <option value="2000" selected>2000</option>
+          <option value="6000">6000</option>
+        </select>
+      </label>
+      <button class="ctl-btn wide" id="btnRunCompare">Run comparison</button>
+      <span class="step-count" id="compareStatus">not yet run</span>
+    </div>
+
+    <div class="chart-wrap">
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--cyan)"></span>Deterministic — comparisons</span>
+        <span><span class="swatch" style="background:var(--violet)"></span>Randomized — comparisons</span>
+      </div>
+      <canvas id="chart" width="1000" height="360" style="width:100%; height:360px;"></canvas>
+      <p class="metric-note">Log scale on the comparison axis. Sorted and reverse-sorted inputs are the classic worst case for a fixed last-element pivot; nearly-sorted sits between the two extremes. Randomized selection flattens all four bars toward the same n·log(n) neighborhood.</p>
+    </div>
+  </section>
+
+  <footer class="note">source: daa10.py — deterministic_quicksort / randomized_quicksort · rendered client-side, no external dependencies</footer>
+</div>
+
+<script>
+/* ============================================================
+   SHARED QUICKSORT LOGIC — mirrors daa10.py exactly
+   ============================================================ */
+function partitionCount(arr, low, high){
+  // returns {pi, comparisons} — used for full-scale runs (comparison view)
+  let comparisons = 0;
+  const pivot = arr[high];
+  let i = low - 1;
+  for(let j = low; j < high; j++){
+    comparisons++;
+    if(arr[j] <= pivot){
+      i++;
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  }
+  [arr[i+1], arr[high]] = [arr[high], arr[i+1]];
+  return {pi: i+1, comparisons};
+}
+function detQuicksortCount(arr, low, high, state){
+  if(low < high){
+    const {pi, comparisons} = partitionCount(arr, low, high);
+    state.c += comparisons;
+    detQuicksortCount(arr, low, pi-1, state);
+    detQuicksortCount(arr, pi+1, high, state);
+  }
+}
+function randQuicksortCount(arr, low, high, state){
+  if(low < high){
+    const r = low + Math.floor(Math.random()*(high-low+1));
+    [arr[r], arr[high]] = [arr[high], arr[r]];
+    const {pi, comparisons} = partitionCount(arr, low, high);
+    state.c += comparisons;
+    randQuicksortCount(arr, low, pi-1, state);
+    randQuicksortCount(arr, pi+1, high, state);
+  }
+}
+
+/* ============================================================
+   STEP-TRACE GENERATOR — for the interactive visualizer
+   Records fine-grained steps: pivot pick, compare, swap, pivot-place, done
+   ============================================================ */
+function generateSteps(inputArr, mode){
+  const arr = inputArr.slice();
+  const steps = [];
+  let comparisons = 0, swaps = 0;
+
+  function snap(extra){
+    steps.push(Object.assign({arr: arr.slice(), comparisons, swaps}, extra));
+  }
+
+  function partition(low, high){
+    if(mode === 'rand'){
+      const r = low + Math.floor(Math.random()*(high-low+1));
+      if(r !== high){
+        [arr[r], arr[high]] = [arr[high], arr[r]];
+        swaps++;
+      }
+      snap({line:'rand-swap', low, high, i:low-1, j:null, pivotIdx:high,
+            caption:`Randomized pivot: picked index ${r}, swapped to position ${high}.`});
+    }
+    const pivot = arr[high];
+    let i = low - 1;
+    snap({line:'pivot', low, high, i, j:null, pivotIdx:high,
+          caption:`Pivot chosen: arr[${high}] = ${pivot}. i starts at ${i}.`});
+    for(let j = low; j < high; j++){
+      comparisons++;
+      snap({line:'compare', low, high, i, j, pivotIdx:high, cmpIdx:j,
+            caption:`Compare arr[${j}] = ${arr[j]} <= pivot (${pivot})? ${arr[j] <= pivot ? 'yes' : 'no'}.`});
+      if(arr[j] <= pivot){
+        i++;
+        if(i !== j){
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+          swaps++;
+          snap({line:'swap', low, high, i, j, pivotIdx:high, swapA:i, swapB:j,
+                caption:`i → ${i}. Swap arr[${i}] and arr[${j}] to move ${arr[i]} left of pivot.`});
+        } else {
+          snap({line:'swap', low, high, i, j, pivotIdx:high,
+                caption:`i → ${i} (already in place, no swap needed).`});
+        }
+      }
+    }
+    [arr[i+1], arr[high]] = [arr[high], arr[i+1]];
+    swaps++;
+    snap({line:'place', low, high, i:i+1, j:null, pivotIdx:i+1, swapA:i+1, swapB:high,
+          caption:`Place pivot: swap arr[${i+1}] and arr[${high}]. Pivot ${arr[i+1]} now at its sorted index ${i+1}.`});
+    return i+1;
+  }
+
+  function qs(low, high){
+    if(low < high){
+      const pi = partition(low, high);
+      snap({line:'recurse', low, high, i:null, j:null, pivotIdx:pi, sortedIdx:pi,
+            caption:`Index ${pi} is finalized. Recurse left on [${low}, ${pi-1}] and right on [${pi+1}, ${high}].`});
+      qs(low, pi-1);
+      qs(pi+1, high);
+    } else if(low === high){
+      snap({line:'base', low, high, i:null, j:null, sortedIdx:low,
+            caption:`Range [${low}, ${high}] has one element — already sorted.`});
+    }
+  }
+
+  snap({line:'start', low:0, high:arr.length-1, i:null, j:null, caption:'Initial array. Ready to sort.'});
+  if(arr.length > 1) qs(0, arr.length-1);
+  snap({line:'done', low:null, high:null, i:null, j:null, caption:`Sorted. Total comparisons: ${comparisons}, swaps: ${swaps}.`});
+  return steps;
+}
+
+/* ============================================================
+   PSEUDOCODE BLOCKS (line-tagged for sync highlighting)
+   ============================================================ */
+const CODE_DET = [
+ {t:'partition(arr, low, high):', line:null, cls:'kw'},
+ {t:'  pivot = arr[high]', line:'pivot'},
+ {t:'  i = low - 1', line:'pivot'},
+ {t:'  for j in low..high-1:', line:'compare'},
+ {t:'    if arr[j] &lt;= pivot:', line:'compare'},
+ {t:'      i += 1; swap(arr[i], arr[j])', line:'swap'},
+ {t:'  swap(arr[i+1], arr[high])', line:'place'},
+ {t:'  return i + 1', line:'place'},
+ {t:'', line:null},
+ {t:'quicksort(arr, low, high):', line:null, cls:'kw'},
+ {t:'  if low &lt; high:', line:'recurse'},
+ {t:'    pi = partition(arr, low, high)', line:'recurse'},
+ {t:'    quicksort(arr, low, pi-1)', line:'recurse'},
+ {t:'    quicksort(arr, pi+1, high)', line:'recurse'},
+];
+const CODE_RAND = [
+ {t:'randomized_quicksort(arr, low, high):', line:null, cls:'kw'},
+ {t:'  if low &lt; high:', line:'rand-swap'},
+ {t:'    r = random(low, high)', line:'rand-swap'},
+ {t:'    swap(arr[r], arr[high])', line:'rand-swap'},
+ {t:'    pi = partition(arr, low, high)', line:'pivot'},
+ {t:'    // ... same partition as deterministic', line:null, cls:'cm'},
+ {t:'    quicksort(arr, low, pi-1)', line:'recurse'},
+ {t:'    quicksort(arr, pi+1, high)', line:'recurse'},
+];
+
+/* ============================================================
+   VISUALIZER STATE + RENDERING
+   ============================================================ */
+let baseArray = makeRandomArray(18);
+let mode = 'det';
+let steps = generateSteps(baseArray, mode);
+let stepIdx = 0;
+let playing = false;
+let playTimer = null;
+
+function makeRandomArray(n){
+  const a = [];
+  for(let i=0;i<n;i++) a.push(1 + Math.floor(Math.random()*95));
+  return a;
+}
+
+function setMode(m){
+  mode = m;
+  document.getElementById('btn-det').classList.toggle('active', m==='det');
+  document.getElementById('btn-rand').classList.toggle('active', m==='rand');
+  steps = generateSteps(baseArray, mode);
+  stepIdx = 0;
+  renderCode();
+  renderComplexity();
+  renderStep();
+}
+
+function renderComplexity(){
+  const el = document.getElementById('complexityBadges');
+  if(mode === 'det'){
+    el.innerHTML = `<span class="badge b-best">best O(n log n)</span><span class="badge b-avg">avg O(n log n)</span><span class="badge b-worst">worst O(n²) on sorted input</span><span class="badge">space O(log n)</span>`;
+  } else {
+    el.innerHTML = `<span class="badge b-best">best O(n log n)</span><span class="badge b-avg">expected O(n log n)</span><span class="badge b-worst">worst O(n²), input-independent</span><span class="badge">space O(log n)</span>`;
+  }
+}
+
+function renderCode(){
+  const block = mode === 'det' ? CODE_DET : CODE_RAND;
+  document.getElementById('codeBlock').dataset.mode = mode;
+  const html = block.map((row,idx)=>{
+    const cls = row.cls ? ' '+row.cls : '';
+    return `<span class="ln" data-line="${row.line||''}" id="ln-${idx}">${row.t || '&nbsp;'}</span>`;
+  }).join('\n');
+  document.getElementById('codeBlock').innerHTML = html;
+}
+
+function highlightCode(lineKey){
+  const spans = document.querySelectorAll('#codeBlock .ln');
+  spans.forEach(s=>{
+    s.classList.toggle('active', lineKey && s.dataset.line === lineKey);
+  });
+}
+
+function renderStep(){
+  const s = steps[stepIdx];
+  const stage = document.getElementById('stage');
+  const n = s.arr.length;
+  const maxV = Math.max(...s.arr);
+  stage.innerHTML = '';
+
+  s.arr.forEach((v, idx)=>{
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.height = (8 + (v/maxV)*84) + '%';
+    if(s.low !== null && s.low !== undefined && s.high !== null && s.high !== undefined){
+      if(idx < s.low || idx > s.high) bar.classList.add('range-out');
+    }
+    if(idx === s.pivotIdx) bar.classList.add('pivot');
+    if(idx === s.cmpIdx) bar.classList.add('cmp');
+    if(idx === s.swapA || idx === s.swapB) bar.classList.add('swap');
+    if(s.sortedIdx === idx || s.line === 'done') bar.classList.add('sorted');
+    bar.title = v;
+    stage.appendChild(bar);
+  });
+
+  // pointer labels
+  const addPtr = (idx, label, cls)=>{
+    if(idx === null || idx === undefined || idx < 0 || idx >= n) return;
+    const p = document.createElement('div');
+    p.className = 'ptr ' + cls;
+    p.style.left = ((idx + 0.5) / n * 100) + '%';
+    p.innerHTML = `<span class="arrow">▲</span>${label}`;
+    stage.appendChild(p);
+  };
+  addPtr(s.i, 'i', 'p-i');
+  addPtr(s.j, 'j', 'p-j');
+  if(s.low !== null && s.low !== undefined && s.line !== 'done') addPtr(s.low, 'low', 'p-low');
+  if(s.high !== null && s.high !== undefined && s.line !== 'done') addPtr(s.high, 'high', 'p-high');
+
+  document.getElementById('caption').innerHTML = s.caption;
+  document.getElementById('statComparisons').textContent = s.comparisons;
+  document.getElementById('statSwaps').textContent = s.swaps;
+  document.getElementById('statDepth').textContent =
+    (s.low!==null && s.low!==undefined) ? `[${s.low}, ${s.high}]` : '—';
+  document.getElementById('stepCount').textContent = `Step ${stepIdx} / ${steps.length-1}`;
+  highlightCode(s.line);
+
+  document.getElementById('btnBack').disabled = stepIdx === 0;
+  document.getElementById('btnFwd').disabled = stepIdx === steps.length-1;
+}
+
+function stepForward(){
+  if(stepIdx < steps.length-1){ stepIdx++; renderStep(); }
+  else pause();
+}
+function stepBack(){
+  if(stepIdx > 0){ stepIdx--; renderStep(); }
+}
+function resetSteps(){
+  pause(); stepIdx = 0; renderStep();
+}
+function play(){
+  if(stepIdx >= steps.length-1) stepIdx = 0;
+  playing = true;
+  document.getElementById('btnPlay').textContent = '⏸ Pause';
+  const speed = 11 - Number(document.getElementById('speedSlider').value);
+  playTimer = setInterval(()=>{
+    if(stepIdx < steps.length-1){ stepIdx++; renderStep(); }
+    else pause();
+  }, speed*160);
+}
+function pause(){
+  playing = false;
+  document.getElementById('btnPlay').textContent = '▶ Play';
+  clearInterval(playTimer);
+}
+
+document.getElementById('btnFwd').addEventListener('click', ()=>{pause(); stepForward();});
+document.getElementById('btnBack').addEventListener('click', ()=>{pause(); stepBack();});
+document.getElementById('btnReset').addEventListener('click', resetSteps);
+document.getElementById('btnPlay').addEventListener('click', ()=> playing ? pause() : play());
+document.getElementById('speedSlider').addEventListener('input', ()=>{ if(playing){ pause(); play(); } });
+document.getElementById('btnNewArr').addEventListener('click', ()=>{
+  baseArray = makeRandomArray(18);
+  steps = generateSteps(baseArray, mode);
+  stepIdx = 0;
+  renderStep();
+});
+document.addEventListener('keydown', (e)=>{
+  if(document.getElementById('view-module').classList.contains('active')){
+    if(e.code === 'Space'){ e.preventDefault(); playing ? pause() : play(); }
+    if(e.code === 'ArrowRight'){ pause(); stepForward(); }
+    if(e.code === 'ArrowLeft'){ pause(); stepBack(); }
+  }
+});
+
+/* ============================================================
+   NAVIGATION
+   ============================================================ */
+function showView(id){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function goHub(){
+  pause();
+  showView('view-hub');
+  document.getElementById('crumbTail').textContent = '';
+}
+function goModule(){
+  showView('view-module');
+  document.getElementById('crumbTail').innerHTML = '<span class="sep">›</span> <span class="here">Quicksort Visualizer</span>';
+  renderCode(); renderComplexity(); renderStep();
+}
+function goCompare(){
+  showView('view-compare');
+  document.getElementById('crumbTail').innerHTML = '<span class="sep">›</span> <span class="here">Comparison View</span>';
+}
+
+/* ============================================================
+   COMPARISON VIEW — full scale runs, real computation
+   ============================================================ */
+function buildTestCases(N){
+  const random = []; for(let i=0;i<N;i++) random.push(1+Math.floor(Math.random()*100000));
+  const sorted = []; for(let i=0;i<N;i++) sorted.push(i);
+  const reverse = []; for(let i=N;i>0;i--) reverse.push(i);
+  const nearly = sorted.slice();
+  for(let k=0;k<Math.floor(N/20);k++){
+    const a = Math.floor(Math.random()*N), b = Math.floor(Math.random()*N);
+    [nearly[a], nearly[b]] = [nearly[b], nearly[a]];
+  }
+  return {Random:random, Sorted:sorted, Reverse:reverse, 'Nearly Sorted':nearly};
+}
+
+function runComparison(){
+  const N = Number(document.getElementById('nSelect').value);
+  document.getElementById('compareStatus').textContent = 'running…';
+  setTimeout(()=>{
+    const cases = buildTestCases(N);
+    const results = {};
+    for(const [name, arr] of Object.entries(cases)){
+      const dArr = arr.slice(); const dState = {c:0};
+      const t0 = performance.now();
+      detQuicksortCount(dArr, 0, dArr.length-1, dState);
+      const dTime = performance.now()-t0;
+
+      const rArr = arr.slice(); const rState = {c:0};
+      const t1 = performance.now();
+      randQuicksortCount(rArr, 0, rArr.length-1, rState);
+      const rTime = performance.now()-t1;
+
+      results[name] = {dComp:dState.c, dTime, rComp:rState.c, rTime};
+    }
+    drawChart(results, N);
+    document.getElementById('compareStatus').textContent = `N = ${N}, computed just now`;
+  }, 30);
+}
+
+function drawChart(results, N){
+  const canvas = document.getElementById('chart');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  const names = Object.keys(results);
+  const maxComp = Math.max(...names.flatMap(n=>[results[n].dComp, results[n].rComp]), 10);
+  const logMax = Math.log10(maxComp);
+  const padL = 60, padB = 46, padT = 20, padR = 20;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const groupW = plotW / names.length;
+  const barW = groupW * 0.28;
+
+  // gridlines (log scale)
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.fillStyle = '#7f8db3';
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'right';
+  const gridSteps = Math.ceil(logMax);
+  for(let g=0; g<=gridSteps; g++){
+    const y = padT + plotH - (g/gridSteps)*plotH;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W-padR, y); ctx.stroke();
+    const val = Math.pow(10, (g/gridSteps)*logMax);
+    ctx.fillText(Math.round(val).toLocaleString(), padL-8, y+4);
+  }
+
+  names.forEach((name, idx)=>{
+    const gx = padL + idx*groupW + groupW/2;
+    const r = results[name];
+    [['dComp','#5be7f0', -1], ['rComp','#a78bfa', 1]].forEach(([key,color,dir])=>{
+      const val = r[key];
+      const h = logMax>0 ? (Math.log10(Math.max(val,1))/logMax)*plotH : 0;
+      const x = gx + dir*(barW*0.6) - barW/2;
+      const y = padT + plotH - h;
+      const grad = ctx.createLinearGradient(0,y,0,padT+plotH);
+      grad.addColorStop(0, color); grad.addColorStop(1, color+'22');
+      ctx.fillStyle = grad;
+      ctx.fillRect(x, y, barW, h);
+      ctx.strokeStyle = color; ctx.lineWidth=1;
+      ctx.strokeRect(x, y, barW, h);
+      ctx.fillStyle = '#dce6f5';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(val.toLocaleString(), x+barW/2, y-6);
+    });
+    ctx.fillStyle = '#7f8db3';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(name, gx, H-padB+22);
+  });
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.beginPath(); ctx.moveTo(padL, padT); ctx.lineTo(padL, padT+plotH); ctx.lineTo(W-padR, padT+plotH); ctx.stroke();
+}
+
+document.getElementById('btnRunCompare').addEventListener('click', runComparison);
+
+/* ============================================================
+   INIT
+   ============================================================ */
+renderCode();
+renderComplexity();
+renderStep();
+</script>
+</body>
+</html>

@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bin Packing Heuristics — Holographic Visualizer</title>
+<style>
+  :root{
+    --bg: #070911;
+    --bg2: #0c101c;
+    --panel: #0f1526;
+    --line: rgba(120,170,255,0.14);
+    --cyan: #3ef2ff;
+    --violet: #b06bff;
+    --amber: #ffcf5c;
+    --green: #34ffa8;
+    --red: #ff5577;
+    --text: #d9e6ff;
+    --muted: #7686a6;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, "Roboto Mono", monospace;
+    --sans: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--sans);}
+  body{
+    min-height:100vh;
+    background:
+      radial-gradient(ellipse at 20% -10%, rgba(176,107,255,0.14), transparent 45%),
+      radial-gradient(ellipse at 90% 0%, rgba(62,242,255,0.10), transparent 40%),
+      repeating-linear-gradient(0deg, rgba(120,170,255,0.035) 0px, rgba(120,170,255,0.035) 1px, transparent 1px, transparent 34px),
+      var(--bg);
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:36px 24px 80px;}
+
+  /* ---------- HUB ---------- */
+  #hub{}
+  .hub-head{margin-bottom:34px;}
+  .hub-eyebrow{font-family:var(--mono);font-size:12.5px;letter-spacing:.14em;color:var(--cyan);text-transform:uppercase;opacity:.85;}
+  .hub-title{font-size:clamp(28px,4vw,42px);font-weight:600;margin:8px 0 6px;line-height:1.1;
+    background:linear-gradient(100deg,#eaf2ff 10%,var(--cyan) 55%,var(--violet) 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;}
+  .hub-sub{color:var(--muted);font-size:15px;max-width:60ch;line-height:1.5;}
+
+  .node-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;}
+  .node-card{
+    position:relative;padding:22px 20px;border-radius:14px;
+    background:linear-gradient(180deg, rgba(20,28,48,.7), rgba(10,14,24,.7));
+    border:1px solid var(--line);cursor:pointer;overflow:hidden;
+    transition:border-color .25s ease, transform .25s ease, box-shadow .25s ease;
+  }
+  .node-card:hover{border-color:rgba(62,242,255,.55);transform:translateY(-2px);
+    box-shadow:0 0 0 1px rgba(62,242,255,.15), 0 14px 34px -18px rgba(62,242,255,.5);}
+  .node-card::before{content:"";position:absolute;inset:0;
+    background:radial-gradient(120px 90px at 85% -10%, rgba(62,242,255,.16), transparent 70%);
+    opacity:0;transition:opacity .25s ease;}
+  .node-card:hover::before{opacity:1;}
+  .node-name{font-size:17.5px;font-weight:600;color:#eef4ff;margin-bottom:6px;}
+  .node-desc{font-size:13.5px;color:var(--muted);line-height:1.5;margin-bottom:16px;}
+  .node-meta{display:flex;gap:8px;flex-wrap:wrap;}
+  .badge{font-family:var(--mono);font-size:11px;padding:4px 9px;border-radius:999px;
+    border:1px solid rgba(62,242,255,.35);color:var(--cyan);background:rgba(62,242,255,.06);}
+  .badge.violet{border-color:rgba(176,107,255,.4);color:var(--violet);background:rgba(176,107,255,.07);}
+
+  /* ---------- MODULE ---------- */
+  #module{display:none;}
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:26px;flex-wrap:wrap;gap:12px;}
+  .backbtn{font-family:var(--mono);font-size:12.5px;color:var(--muted);background:none;border:1px solid var(--line);
+    padding:8px 14px;border-radius:8px;cursor:pointer;letter-spacing:.03em;transition:all .2s;}
+  .backbtn:hover{color:var(--cyan);border-color:rgba(62,242,255,.4);}
+  .mod-title{font-size:26px;font-weight:600;color:#eef4ff;}
+  .badges-row{display:flex;gap:8px;flex-wrap:wrap;}
+
+  .aim-box{border:1px solid var(--line);border-left:2px solid var(--cyan);background:rgba(62,242,255,.035);
+    border-radius:0 10px 10px 0;padding:14px 18px;margin-bottom:26px;font-size:14.5px;color:#c6d6f5;line-height:1.55;}
+  .aim-label{font-family:var(--mono);font-size:11px;color:var(--cyan);letter-spacing:.12em;margin-bottom:5px;text-transform:uppercase;}
+
+  .tabs{display:flex;gap:6px;margin-bottom:20px;border-bottom:1px solid var(--line);}
+  .tab{font-family:var(--mono);font-size:13px;padding:10px 16px;color:var(--muted);cursor:pointer;
+    border-bottom:2px solid transparent;transition:all .2s;}
+  .tab.active{color:var(--cyan);border-bottom-color:var(--cyan);}
+  .tab:hover{color:#eef4ff;}
+
+  .stage{display:grid;grid-template-columns:1.4fr 1fr;gap:20px;margin-bottom:20px;}
+  @media(max-width:860px){.stage{grid-template-columns:1fr;}}
+
+  .panel{border:1px solid var(--line);border-radius:14px;background:rgba(12,16,28,.65);padding:18px 20px;}
+  .panel-label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin-bottom:14px;}
+
+  /* controls */
+  .controls{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;}
+  .ctl-btn{width:38px;height:38px;border-radius:9px;border:1px solid var(--line);background:rgba(20,28,48,.6);
+    color:var(--cyan);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .2s;}
+  .ctl-btn:hover{border-color:rgba(62,242,255,.55);box-shadow:0 0 12px -2px rgba(62,242,255,.5);}
+  .ctl-btn.primary{background:linear-gradient(135deg, rgba(62,242,255,.18), rgba(176,107,255,.18));}
+  .ctl-btn:disabled{opacity:.35;cursor:not-allowed;}
+  .step-counter{font-family:var(--mono);font-size:12.5px;color:var(--muted);margin-left:4px;min-width:76px;}
+  .speed-wrap{display:flex;align-items:center;gap:8px;margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--muted);}
+  input[type=range]{accent-color:var(--cyan);width:90px;}
+
+  .caption{font-size:14px;color:#cfe0ff;min-height:22px;padding:10px 14px;border-radius:9px;
+    background:rgba(176,107,255,.06);border:1px solid rgba(176,107,255,.2);margin-bottom:18px;
+    transition:opacity .15s ease;}
+
+  .item-tray{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px;}
+  .chip{font-family:var(--mono);font-size:12px;padding:5px 9px;border-radius:6px;border:1px solid var(--line);
+    color:var(--muted);background:rgba(255,255,255,.02);transition:all .25s;}
+  .chip.current{color:#0a0e18;background:var(--amber);border-color:var(--amber);
+    box-shadow:0 0 14px -2px rgba(255,207,92,.7);font-weight:600;}
+  .chip.done{color:var(--green);border-color:rgba(52,255,168,.3);}
+
+  .bins-row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;min-height:280px;}
+  .bin{width:70px;display:flex;flex-direction:column;align-items:center;gap:6px;}
+  .bin-label{font-family:var(--mono);font-size:11px;color:var(--muted);}
+  .bin-tube{width:64px;height:230px;border-radius:8px;border:1.5px solid var(--line);position:relative;
+    background:rgba(255,255,255,.015);overflow:hidden;display:flex;flex-direction:column-reverse;transition:border-color .25s, box-shadow .25s;}
+  .bin-tube.checking{border-color:rgba(255,207,92,.75);box-shadow:0 0 18px -3px rgba(255,207,92,.6);}
+  .bin-tube.target{border-color:rgba(52,255,168,.85);box-shadow:0 0 22px -3px rgba(52,255,168,.7);}
+  .seg{width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-size:10.5px;color:#0a0e18;font-weight:600;
+    border-top:1px solid rgba(0,0,0,.25);animation:rise .38s ease;}
+  @keyframes rise{from{transform:translateY(14px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+  .bin-fill{font-family:var(--mono);font-size:10.5px;color:var(--muted);}
+  .new-bin-ghost{opacity:.3;border-style:dashed;}
+
+  /* code panel */
+  .code{font-family:var(--mono);font-size:12.5px;line-height:1.9;color:#8fa2c8;white-space:pre;overflow-x:auto;}
+  .code .ln{display:block;padding:1px 8px;border-radius:4px;border-left:2px solid transparent;}
+  .code .ln.active{background:rgba(62,242,255,.1);border-left-color:var(--cyan);color:#eaf4ff;}
+
+  .collapse{border:1px solid var(--line);border-radius:12px;background:rgba(12,16,28,.5);margin-bottom:20px;overflow:hidden;}
+  .collapse summary{cursor:pointer;padding:14px 18px;font-family:var(--mono);font-size:12px;letter-spacing:.08em;
+    color:var(--cyan);text-transform:uppercase;list-style:none;display:flex;align-items:center;gap:8px;}
+  .collapse summary::-webkit-details-marker{display:none;}
+  .collapse summary::before{content:"▸";transition:transform .2s;}
+  .collapse[open] summary::before{transform:rotate(90deg);}
+  .collapse-body{padding:0 18px 16px;font-size:13.5px;color:#c6d6f5;line-height:1.6;}
+
+  .complexity-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;}
+
+  .compare-panel{border:1px solid var(--line);border-radius:14px;background:rgba(12,16,28,.65);padding:20px 22px;}
+  .bars{display:flex;align-items:flex-end;gap:26px;height:170px;padding-top:14px;}
+  .cbar-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;flex:1;}
+  .cbar{width:44px;border-radius:6px 6px 0 0;transition:height .5s ease;position:relative;}
+  .cbar-val{font-family:var(--mono);font-size:12px;color:#eaf4ff;}
+  .cbar-label{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ================= HUB ================= -->
+  <div id="hub">
+    <div class="hub-head">
+      <div class="hub-eyebrow">DAA Lab · Experiment 09</div>
+      <div class="hub-title">Bin Packing Heuristics</div>
+      <div class="hub-sub">Three greedy strategies for the 1-D bin packing problem, traced step by step against the same item list so you can see exactly where each heuristic makes a different call.</div>
+    </div>
+    <div class="node-grid">
+      <div class="node-card" onclick="openModule()">
+        <div class="node-name">First Fit · First Fit Decreasing · Best Fit Decreasing</div>
+        <div class="node-desc">Pack 10 fractional items into unit-capacity bins. Compare how sort order and placement rule change the bin count.</div>
+        <div class="node-meta">
+          <span class="badge">O(n²) time</span>
+          <span class="badge violet">O(n) space</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODULE ================= -->
+  <div id="module">
+    <div class="topbar">
+      <button class="backbtn" onclick="closeModule()">← Hub</button>
+      <div class="mod-title">Bin Packing Heuristics</div>
+      <div class="badges-row">
+        <span class="badge">Best: O(n)</span>
+        <span class="badge">Avg: O(n log n)</span>
+        <span class="badge violet">Worst: O(n²)</span>
+      </div>
+    </div>
+
+    <div class="aim-box">
+      <div class="aim-label">Aim</div>
+      Pack a list of items into the fewest possible fixed-capacity bins, comparing three greedy heuristics that trade a bit of optimality for speed.
+    </div>
+
+    <div class="tabs" id="tabs"></div>
+
+    <div class="stage">
+      <div class="panel">
+        <div class="panel-label" id="algoLabel">First Fit</div>
+        <div class="controls">
+          <button class="ctl-btn" id="btnReset" title="Reset">⟲</button>
+          <button class="ctl-btn" id="btnBack" title="Step back">◂</button>
+          <button class="ctl-btn primary" id="btnPlay" title="Play/Pause">▶</button>
+          <button class="ctl-btn" id="btnFwd" title="Step forward">▸</button>
+          <span class="step-counter" id="stepCounter">Step 0 / 0</span>
+          <div class="speed-wrap">Speed <input type="range" id="speedSlider" min="200" max="1600" value="750" step="50"></div>
+        </div>
+        <div class="caption" id="caption">Press play or step forward to begin.</div>
+        <div class="item-tray" id="itemTray"></div>
+        <div class="bins-row" id="binsRow"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-label">Pseudocode</div>
+        <div class="code" id="codeBlock"></div>
+      </div>
+    </div>
+
+    <details class="collapse">
+      <summary>Result &amp; Inference</summary>
+      <div class="collapse-body">
+        First Fit places each item into the first bin it fits, in the original order, so its bin count depends heavily on how the items arrive. Sorting items largest-first before running First Fit (First Fit Decreasing) tends to close gaps sooner, since big items claim space early instead of fragmenting bins later. Best Fit Decreasing goes further: for each item it scans every open bin and chooses the one that will be left with the least leftover space, which on this item set uses no more bins than the other two and often matches or beats them. All three stay within a small constant factor of the optimal bin count for this kind of greedy approach, while the exhaustive optimum would need far more computation to find.
+      </div>
+    </details>
+
+    <div class="compare-panel">
+      <div class="panel-label">Bins used — comparison</div>
+      <div class="bars" id="compareBars"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const ITEMS = [0.5, 0.7, 0.3, 0.9, 0.2, 0.6, 0.8, 0.4, 0.1, 0.5];
+const CAPACITY = 1.0;
+
+const ALGOS = {
+  ff:  { name: 'First Fit',            short:'FF',  color:'#3ef2ff', decreasing:false, strategy:'first' },
+  ffd: { name: 'First Fit Decreasing', short:'FFD', color:'#b06bff', decreasing:true,  strategy:'first' },
+  bfd: { name: 'Best Fit Decreasing',  short:'BFD', color:'#34ffa8', decreasing:true,  strategy:'best'  }
+};
+
+const PSEUDOCODE = {
+  first: [
+    'for item in items:',
+    '  placed = False',
+    '  for i, bin in enumerate(bins):',
+    '    if bin.space >= item:',
+    '      bin.space -= item',
+    '      bin.add(item); placed = True; break',
+    '  if not placed:',
+    '    bins.append(new Bin(capacity - item))'
+  ],
+  best: [
+    'for item in items:',
+    '  best_idx = -1; best_space = inf',
+    '  for i, bin in enumerate(bins):',
+    '    if bin.space >= item and bin.space-item < best_space:',
+    '      best_space = bin.space - item; best_idx = i',
+    '  if best_idx >= 0:',
+    '    bins[best_idx].space -= item; bins[best_idx].add(item)',
+    '  else:',
+    '    bins.append(new Bin(capacity - item))'
+  ]
+};
+
+function genSteps(key){
+  const cfg = ALGOS[key];
+  const order = cfg.decreasing ? ITEMS.slice().sort((a,b)=>b-a) : ITEMS.slice();
+  let space = [], contents = [], steps = [];
+  const snap = () => ({ contents: contents.map(c=>c.slice()), space: space.slice() });
+
+  order.forEach((item) => {
+    steps.push({ type:'consider', item, ...snap(),
+      msg: `Considering item ${item.toFixed(1)}`, line: cfg.strategy==='first'?0:0 });
+
+    if (cfg.strategy === 'first') {
+      let placed = false;
+      for (let i=0; i<space.length; i++){
+        steps.push({ type:'check', item, checkBin:i, ...snap(),
+          msg:`Checking bin ${i+1} — space ${space[i].toFixed(1)}, item ${item.toFixed(1)}`, line:2 });
+        if (space[i] >= item - 1e-9){
+          space[i] -= item; contents[i].push(item); placed = true;
+          steps.push({ type:'place', item, binIndex:i, ...snap(),
+            msg:`Fits — placed ${item.toFixed(1)} into bin ${i+1}`, line:4 });
+          break;
+        }
+      }
+      if (!placed){
+        space.push(CAPACITY-item); contents.push([item]);
+        steps.push({ type:'newbin', item, binIndex:space.length-1, ...snap(),
+          msg:`No open bin fits — opened bin ${space.length}`, line:6 });
+      }
+    } else {
+      let bestIdx=-1, bestSpace=Infinity;
+      for (let i=0;i<space.length;i++){
+        steps.push({ type:'check', item, checkBin:i, ...snap(),
+          msg:`Checking bin ${i+1} — space ${space[i].toFixed(1)}, item ${item.toFixed(1)}`, line:2 });
+        if (space[i] >= item - 1e-9 && space[i]-item < bestSpace - 1e-9){
+          bestSpace = space[i]-item; bestIdx = i;
+        }
+      }
+      if (bestIdx >= 0){
+        space[bestIdx] -= item; contents[bestIdx].push(item);
+        steps.push({ type:'place', item, binIndex:bestIdx, ...snap(),
+          msg:`Best fit is bin ${bestIdx+1} (leftover ${bestSpace.toFixed(1)}) — placed`, line:5 });
+      } else {
+        space.push(CAPACITY-item); contents.push([item]);
+        steps.push({ type:'newbin', item, binIndex:space.length-1, ...snap(),
+          msg:`No bin fits — opened bin ${space.length}`, line:8 });
+      }
+    }
+  });
+
+  steps.push({ type:'done', ...snap(), msg:`Done — ${contents.length} bins used`, line:-1 });
+  return { order, steps, finalBinCount: contents.length };
+}
+
+const RESULTS = {};
+Object.keys(ALGOS).forEach(k => RESULTS[k] = genSteps(k));
+
+let currentAlgo = 'ff';
+let stepIdx = 0;
+let playing = false;
+let timer = null;
+
+function openModule(){
+  document.getElementById('hub').style.display = 'none';
+  document.getElementById('module').style.display = 'block';
+  buildTabs();
+  selectAlgo('ff');
+  renderCompare();
+}
+function closeModule(){
+  pause();
+  document.getElementById('module').style.display = 'none';
+  document.getElementById('hub').style.display = 'block';
+}
+
+function buildTabs(){
+  const tabs = document.getElementById('tabs');
+  tabs.innerHTML = '';
+  Object.keys(ALGOS).forEach(k=>{
+    const t = document.createElement('div');
+    t.className = 'tab' + (k===currentAlgo ? ' active' : '');
+    t.textContent = ALGOS[k].name;
+    t.onclick = () => selectAlgo(k);
+    t.dataset.k = k;
+    tabs.appendChild(t);
+  });
+}
+
+function selectAlgo(k){
+  pause();
+  currentAlgo = k;
+  stepIdx = 0;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.k===k));
+  document.getElementById('algoLabel').textContent = ALGOS[k].name + ' — live trace';
+  renderCode();
+  renderTray();
+  renderStep();
+}
+
+function renderTray(){
+  const order = RESULTS[currentAlgo].order;
+  const tray = document.getElementById('itemTray');
+  tray.innerHTML = order.map((it,i)=>`<span class="chip" data-i="${i}">${it.toFixed(1)}</span>`).join('');
+}
+
+function renderCode(){
+  const cfg = ALGOS[currentAlgo];
+  const lines = PSEUDOCODE[cfg.strategy];
+  document.getElementById('codeBlock').innerHTML =
+    lines.map((l,i)=>`<span class="ln" data-i="${i}">${escapeHtml(l)}</span>`).join('\n');
+}
+function escapeHtml(s){ return s.replace(/</g,'&lt;'); }
+
+function renderStep(){
+  const R = RESULTS[currentAlgo];
+  const steps = R.steps;
+  const s = steps[stepIdx];
+  const cfg = ALGOS[currentAlgo];
+
+  document.getElementById('stepCounter').textContent = `Step ${stepIdx} / ${steps.length-1}`;
+  document.getElementById('caption').textContent = s.msg;
+  document.getElementById('btnBack').disabled = stepIdx===0;
+  document.getElementById('btnFwd').disabled = stepIdx===steps.length-1;
+
+  // code highlight
+  document.querySelectorAll('#codeBlock .ln').forEach(el=>{
+    el.classList.toggle('active', s.line>=0 && Number(el.dataset.i)===s.line);
+  });
+
+  // item tray highlight: mark items already fully processed as done, current as active
+  const order = R.order;
+  let consideredCount = 0;
+  for (let i=0;i<=stepIdx;i++){ if (steps[i].type==='consider') consideredCount++; }
+  document.querySelectorAll('#itemTray .chip').forEach((chip,i)=>{
+    chip.classList.remove('current','done');
+    if (i < consideredCount-1) chip.classList.add('done');
+    else if (i === consideredCount-1) chip.classList.add('current');
+  });
+
+  // bins
+  const binsRow = document.getElementById('binsRow');
+  binsRow.innerHTML = '';
+  const nBins = Math.max(s.contents.length, 1);
+  for (let i=0;i<s.contents.length;i++){
+    const used = s.contents[i].reduce((a,b)=>a+b,0);
+    const tubeClasses = ['bin-tube'];
+    if (s.type==='check' && s.checkBin===i) tubeClasses.push('checking');
+    if ((s.type==='place' || s.type==='newbin') && s.binIndex===i) tubeClasses.push('target');
+    const segs = s.contents[i].map((v,vi)=>{
+      const h = Math.max(v*230, 14);
+      const hue = 190 + vi*22;
+      return `<div class="seg" style="height:${h}px;background:hsl(${hue} 90% 62%);">${v.toFixed(1)}</div>`;
+    }).join('');
+    binsRow.innerHTML += `
+      <div class="bin">
+        <div class="bin-tube ${tubeClasses.join(' ')}" style="height:230px;">${segs}</div>
+        <div class="bin-label">Bin ${i+1}</div>
+        <div class="bin-fill">${used.toFixed(1)} / ${CAPACITY.toFixed(1)}</div>
+      </div>`;
+  }
+  binsRow.scrollLeft = binsRow.scrollWidth;
+}
+
+function step(delta){
+  const steps = RESULTS[currentAlgo].steps;
+  stepIdx = Math.min(Math.max(stepIdx+delta,0), steps.length-1);
+  renderStep();
+  if (stepIdx === steps.length-1) pause();
+}
+
+function play(){
+  if (playing) return;
+  playing = true;
+  document.getElementById('btnPlay').textContent = '⏸';
+  const speed = () => Number(document.getElementById('speedSlider').value);
+  const tick = () => {
+    if (!playing) return;
+    const steps = RESULTS[currentAlgo].steps;
+    if (stepIdx >= steps.length-1){ pause(); return; }
+    step(1);
+    timer = setTimeout(tick, speed());
+  };
+  timer = setTimeout(tick, speed());
+}
+function pause(){
+  playing = false;
+  document.getElementById('btnPlay').textContent = '▶';
+  clearTimeout(timer);
+}
+function resetAlgo(){
+  pause(); stepIdx = 0; renderStep();
+}
+
+document.getElementById('btnPlay').onclick = () => playing ? pause() : play();
+document.getElementById('btnFwd').onclick  = () => { pause(); step(1); };
+document.getElementById('btnBack').onclick = () => { pause(); step(-1); };
+document.getElementById('btnReset').onclick = resetAlgo;
+
+document.addEventListener('keydown', (e)=>{
+  if (document.getElementById('module').style.display !== 'block') return;
+  if (e.code === 'Space'){ e.preventDefault(); playing ? pause() : play(); }
+  if (e.code === 'ArrowRight'){ pause(); step(1); }
+  if (e.code === 'ArrowLeft'){ pause(); step(-1); }
+});
+
+function renderCompare(){
+  const lowerBound = Math.ceil(ITEMS.reduce((a,b)=>a+b,0) / CAPACITY);
+  const rows = [
+    { label:'Lower bound', val: lowerBound, color:'#3d4a68' },
+    { label:'FF',  val: RESULTS.ff.finalBinCount,  color: ALGOS.ff.color },
+    { label:'FFD', val: RESULTS.ffd.finalBinCount, color: ALGOS.ffd.color },
+    { label:'BFD', val: RESULTS.bfd.finalBinCount, color: ALGOS.bfd.color },
+  ];
+  const max = Math.max(...rows.map(r=>r.val), 1);
+  const bars = document.getElementById('compareBars');
+  bars.innerHTML = rows.map(r => `
+    <div class="cbar-wrap">
+      <div class="cbar-val">${r.val}</div>
+      <div class="cbar" style="height:${(r.val/max*140)}px;background:${r.color};box-shadow:0 0 16px -4px ${r.color};"></div>
+      <div class="cbar-label">${r.label}</div>
+    </div>`).join('');
+}
+</script>
+</body>
+</html>
